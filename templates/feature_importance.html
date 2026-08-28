@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4 text-center">
+    <h4 class="fw-bold text-dark mb-3"><i class="fa-solid fa-chart-bar text-primary me-2"></i>Tingkat Kepentingan Variabel (Feature Importance)</h4>
+    <div>
+        <img src="data:image/png;base64,{{ img_fi }}" class="img-fluid rounded shadow-sm">
+    </div>
+</div>
+{% endblock %}

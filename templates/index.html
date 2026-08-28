@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white text-center">
+                <h4 class="mt-2 text-primary">Cek Tingkat Kecanduan Smartphone Pada Balita</h4>
+                <p class="text-muted mb-0">Silakan isi total skor kuesioner dari orang tua balita (Akses Publik)</p>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Total Skor X1 (Durasi Penggunaan)</label>
+                            <input type="number" step="0.1" class="form-control" name="x1" required placeholder="Contoh: 6">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Total Skor X2 (Frekuensi Penggunaan)</label>
+                            <input type="number" step="0.1" class="form-control" name="x2" required placeholder="Contoh: 5">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Total Skor X3 (Pengawasan Orang Tua)</label>
+                            <input type="number" step="0.1" class="form-control" name="x3" required placeholder="Contoh: 7">
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <label class="form-label">Total Skor X4 (Tujuan Penggunaan)</label>
+                            <input type="number" step="0.1" class="form-control" name="x4" required placeholder="Contoh: 6">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 btn-lg">Proses Klasifikasi (Random Forest)</button>
+                </form>
+
+                {% if hasil %}
+                <div class="alert alert-info mt-4 text-center border-0 shadow-sm">
+                    <h5 class="mb-1">Hasil Prediksi Sistem:</h5>
+                    <h2 class="fw-bold mb-0 text-uppercase">{{ hasil }}</h2>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

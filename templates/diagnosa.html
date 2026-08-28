@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card p-4 mb-4">
+            <h4 class="fw-bold text-primary mb-3"><i class="fa-solid fa-stethoscope me-2"></i>Form Diagnosa Tingkat Kecanduan Smartphone Balita</h4>
+            <form method="POST">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Skor X1 (Durasi Penggunaan)</label>
+                        <input type="number" step="0.1" class="form-control" name="x1" required placeholder="Rentang 3 - 15">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Skor X2 (Frekuensi Penggunaan)</label>
+                        <input type="number" step="0.1" class="form-control" name="x2" required placeholder="Rentang 3 - 15">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Skor X3 (Tingkat Pengawasan Ortu)</label>
+                        <input type="number" step="0.1" class="form-control" name="x3" required placeholder="Rentang 3 - 15">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Skor X4 (Tujuan Penggunaan Gadget)</label>
+                        <input type="number" step="0.1" class="form-control" name="x4" required placeholder="Rentang 3 - 15">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill mt-2">Proses Diagnosa (Random Forest)</button>
+            </form>
+        </div>
+
+        {% if hasil %}
+        <div class="card p-4 border-start border-5 border-{{ evaluasi.badge_color }}">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="fw-bold mb-0">Hasil Diagnosa: <span class="badge bg-{{ evaluasi.badge_color }}">{{ hasil }}</span></h4>
+                <small class="text-muted">{{ evaluasi.status }}</small>
+            </div>
+            
+            <p class="fs-5">{{ evaluasi.penjelasan }}</p>
+            
+            <h5 class="fw-bold text-dark mt-3 mb-2"><i class="fa-solid fa-user-nurse text-danger me-2"></i>Panduan & Evaluasi Khusus Orang Tua/Ibu:</h5>
+            <ul class="list-group list-group-flush mb-3">
+                {% for poin in evaluasi.evaluasi_ortu %}
+                <li class="list-group-item bg-transparent"><i class="fa-solid fa-check-circle text-success me-2"></i>{{ poin }}</li>
+                {% endfor %}
+            </ul>
+
+            <h6 class="fw-bold text-muted mt-2">Probabilitas Keputusan Model:</h6>
+            <div class="d-flex gap-3">
+                {% for k, v in probabilitas.items() %}
+                <span class="badge bg-secondary p-2">{{ k }}: {{ v }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

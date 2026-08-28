@@ -1,0 +1,26 @@
+node_modules/
+.next/
+dist/
+.env
+node_modules/
+.next/
+dist/
+.env
+node_modules/
+.next/
+dist/
+.env
+node_modules/
+.next/
+dist/
+.env
+node_modules/
+.next/
+dist/
+.env
+.env.local
+.env.development.local
+.venv
+model_random_forest.pkl
+tabulasi data2.csv
+Hasil_Klasifikasi_Responden_RF.xlsx

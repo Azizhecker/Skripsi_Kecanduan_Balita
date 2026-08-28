@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card card-header-custom p-4 d-flex flex-row align-items-center justify-content-between">
+            <div>
+                <h2 class="fw-bold mb-1">Dashboard Model Random Forest</h2>
+                <p class="mb-0 text-white-50">Evaluasi Performa & Akurasi Klasifikasi Kecanduan Balita</p>
+            </div>
+            <div class="bg-white text-dark px-4 py-2 rounded-3 text-center shadow-sm">
+                <small class="text-muted d-block fw-bold">AKURASI MODEL</small>
+                <h2 class="fw-bold text-primary mb-0">{{ accuracy }}%</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card p-3 h-100">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-border-all text-primary me-2"></i>Grafik 1: Heatmap Confusion Matrix</h5>
+            <div class="text-center">
+                <img src="data:image/png;base64,{{ img_cm_heatmap }}" class="img-fluid rounded">
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card p-3 h-100">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-chart-column text-success me-2"></i>Grafik 2: Breakdown Prediksi vs Aktual</h5>
+            <div class="text-center">
+                <img src="data:image/png;base64,{{ img_cm_bar }}" class="img-fluid rounded">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card p-4">
+    <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-list-check text-info me-2"></i>Classification Report Lengkap</h5>
+    <div class="table-responsive">
+        {{ report_table | safe }}
+    </div>
+</div>
+{% endblock %}

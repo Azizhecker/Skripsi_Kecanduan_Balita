@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h3 class="mb-4">Dashboard Admin</h3>
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Informasi Model</h5>
+                <ul>
+                    <li><strong>Algoritma:</strong> Random Forest Classifier</li>
+                    <li><strong>Akurasi Model:</strong> 60.00%</li>
+                    <li><strong>Jumlah Data Training:</strong> 120 Responden (80%)</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Upload Data Kuesioner Baru (Massal)</h5>
+                <form method="POST" enctype="multipart/form-data" class="d-flex align-items-center">
+                    <input class="form-control me-3" type="file" name="file" accept=".csv" required>
+                    <button class="btn btn-success" type="submit">Upload & Prediksi</button>
+                </form>
+
+                {% if data_html %}
+                <h5 class="mt-4">Hasil Klasifikasi File:</h5>
+                <div class="table-responsive mt-3">
+                    {{ data_html | safe }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

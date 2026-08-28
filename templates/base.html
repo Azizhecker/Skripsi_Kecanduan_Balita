@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Klasifikasi Kecanduan Balita - Random Forest</title>
+    <!-- Bootstrap 5 & FontAwesome -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --sidebar-bg: #2b364b;
+            --sidebar-active: #4a5c7d;
+            --accent-color: #ff758c;
+            --bg-color: #f4f6f9;
+        }
+        body { background-color: var(--bg-color); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .sidebar { min-height: 100vh; background-color: var(--sidebar-bg); color: white; width: 260px; position: fixed; }
+        .sidebar .nav-link { color: #cfd8dc; padding: 12px 20px; font-weight: 500; border-radius: 6px; margin: 2px 10px; }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active { background-color: var(--sidebar-active); color: #fff; }
+        .main-content { margin-left: 260px; padding: 30px; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .card-header-custom { background: linear-gradient(135deg, #4a69bd, #6a89cc); color: white; border-radius: 12px 12px 0 0 !important; }
+        .modal-header-custom { background: linear-gradient(135deg, #ff758c, #ff7eb3); color: white; }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR NAVIGATION -->
+<div class="sidebar d-flex flex-column justify-content-between p-3">
+    <div>
+        <div class="text-center py-3 mb-3 border-bottom border-secondary">
+            <h5 class="fw-bold text-white mb-0"><i class="fa-solid fa-child-reaching me-2"></i>SKRIPSI BALITA</h5>
+            <small class="text-warning">Random Forest Model</small>
+        </div>
+        <ul class="nav nav-pills flex-column">
+            <li class="nav-item"><a href="/" class="nav-link"><i class="fa-solid fa-chart-pie me-2"></i> Dashboard & Evaluasi</a></li>
+            <li class="nav-item"><a href="/tabulasi" class="nav-link"><i class="fa-solid fa-table me-2"></i> Tabulasi Data CSV</a></li>
+            <li class="nav-item"><a href="/skor-target" class="nav-link"><i class="fa-solid fa-calculator me-2"></i> Skor X1-X4 & Target</a></li>
+            <li class="nav-item"><a href="/excel-view" class="nav-link"><i class="fa-solid fa-file-excel me-2"></i> Hasil Excel RF</a></li>
+            <li class="nav-item"><a href="/diagnosa" class="nav-link"><i class="fa-solid fa-stethoscope me-2"></i> Form Cek Kecanduan</a></li>
+            <li class="nav-item"><a href="/feature-importance" class="nav-link"><i class="fa-solid fa-chart-bar me-2"></i> Feature Importance</a></li>
+            <li class="nav-item"><a href="/decision-tree" class="nav-link"><i class="fa-solid fa-sitemap me-2"></i> Decision Tree #1</a></li>
+        </ul>
+    </div>
+    <div class="border-top border-secondary pt-3">
+        {% if session.get('logged_in') %}
+            <a href="/admin" class="btn btn-warning w-100 mb-2"><i class="fa-solid fa-user-gear me-1"></i> Panel Admin</a>
+            <a href="/logout" class="btn btn-outline-light w-100"><i class="fa-solid fa-right-from-bracket me-1"></i> Logout</a>
+        {% else %}
+            <a href="/login" class="btn btn-outline-light w-100"><i class="fa-solid fa-lock me-1"></i> Login Admin</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- MAIN CONTENT AREA -->
+<div class="main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</div>
+
+<!-- POP UP MODAL SAMBUTAN (Hanya muncul saat pertama buka) -->
+{% if show_modal %}
+<div class="modal fade" id="welcomeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center">
+      <div class="modal-header modal-header-custom">
+        <h5 class="modal-title fw-bold"><i class="fa-solid fa-heart me-2"></i>Selamat Datang Ibu & Pembimbing</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <!-- SVG Ilustrasi Smartphone & Balita -->
+        <svg class="mb-3" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#ff758c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            <path d="M12 6a3 3 0 0 0-3 3v1a3 3 0 0 0 6 0V9a3 3 0 0 0-3-3z"></path>
+            <path d="M6 15a6 6 0 0 1 12 0"></path>
+        </svg>
+        <h4 class="fw-bold text-dark">Sistem Klasifikasi Kecanduan Smartphone Balita</h4>
+        <p class="text-muted">Penerapan Algoritma Random Forest untuk Deteksi Dini Ketergantungan Gadget pada Balita.</p>
+        <button type="button" class="btn btn-danger btn-lg px-4 rounded-pill" data-bs-dismiss="modal">Masuk ke Aplikasi</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var myModalEl = document.getElementById('welcomeModal');
+        if (myModalEl) {
+            var myModal = new bootstrap.Modal(myModalEl);
+            myModal.show();
+        }
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card p-4 h-100">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-calculator text-primary me-2"></i>Hasil Perhitungan Skor X1-X4 & Total Y</h5>
+            <div class="table-responsive" style="max-height: 400px;">
+                {{ skor_table | safe }}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-4 mb-4">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-chart-pie text-warning me-2"></i>Sebaran Data Target</h5>
+            {{ target_table | safe }}
+        </div>
+        <div class="card p-4 bg-light">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-file-code text-danger me-2"></i>Detail File model_random_forest.pkl</h5>
+            <ul class="list-group list-group-flush small">
+                <li class="list-group-item bg-transparent"><strong>Nama File:</strong> {{ model_info.nama_file }}</li>
+                <li class="list-group-item bg-transparent"><strong>Ukuran File:</strong> {{ model_info.ukuran_file }}</li>
+                <li class="list-group-item bg-transparent"><strong>Tipe Model:</strong> {{ model_info.tipe_model }}</li>
+                <li class="list-group-item bg-transparent"><strong>Jumlah Trees:</strong> {{ model_info.jumlah_pohon }}</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
