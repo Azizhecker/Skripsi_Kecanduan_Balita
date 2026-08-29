@@ -1,36 +1,394 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h3 class="mb-4">Dashboard Admin</h3>
-        
-        <div class="card shadow-sm mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Informasi Model</h5>
-                <ul>
-                    <li><strong>Algoritma:</strong> Random Forest Classifier</li>
-                    <li><strong>Akurasi Model:</strong> 60.00%</li>
-                    <li><strong>Jumlah Data Training:</strong> 120 Responden (80%)</li>
-                </ul>
-            </div>
-        </div>
 
-        <div class="card shadow-sm">
+{% block content %}
+
+<div class="row">
+
+    <div class="col-md-12">
+
+        <h3 class="mb-4">
+            Dashboard Admin
+        </h3>
+
+
+        <!-- ================================================= -->
+        <!-- DATASET AKTIF -->
+        <!-- ================================================= -->
+
+        <div class="card shadow-sm mb-4">
+
             <div class="card-body">
-                <h5 class="card-title mb-3">Upload Data Kuesioner Baru (Massal)</h5>
-                <form method="POST" enctype="multipart/form-data" class="d-flex align-items-center">
-                    <input class="form-control me-3" type="file" name="file" accept=".csv" required>
-                    <button class="btn btn-success" type="submit">Upload & Prediksi</button>
+
+                <h5 class="card-title mb-3">
+                    Dataset Aktif
+                </h5>
+
+                <form method="POST">
+
+                    <input
+                        type="hidden"
+                        name="action"
+                        value="select_dataset"
+                    >
+
+                    <div class="row">
+
+                        <div class="col-md-9">
+
+                            <select
+                                class="form-select"
+                                name="dataset_id"
+                                required
+                            >
+
+                                {% for item in dataset_list %}
+
+                                <option
+                                    value="{{ item.id }}"
+                                    {% if item.id == active_dataset %}
+                                    selected
+                                    {% endif %}
+                                >
+
+                                    {{ item.name }}
+
+                                    {% if item.total_data %}
+                                    - {{ item.total_data }} Data
+                                    {% endif %}
+
+                                    {% if item.accuracy is not none %}
+                                    - Akurasi {{ "%.2f"|format(item.accuracy * 100) }}%
+                                    {% endif %}
+
+                                </option>
+
+                                {% endfor %}
+
+                            </select>
+
+                        </div>
+
+
+                        <div class="col-md-3">
+
+                            <button
+                                type="submit"
+                                class="btn btn-primary w-100"
+                            >
+
+                                Tampilkan Dataset
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
                 </form>
 
-                {% if data_html %}
-                <h5 class="mt-4">Hasil Klasifikasi File:</h5>
-                <div class="table-responsive mt-3">
-                    {{ data_html | safe }}
-                </div>
-                {% endif %}
             </div>
+
         </div>
+
+
+        <!-- ================================================= -->
+        <!-- INFORMASI MODEL -->
+        <!-- ================================================= -->
+
+        <div class="card shadow-sm mb-4">
+
+            <div class="card-body">
+
+                <h5 class="card-title">
+                    Informasi Model Aktif
+                </h5>
+
+                <ul class="mb-0">
+
+                    <li>
+                        <strong>Dataset:</strong>
+                        {{ dataset_file }}
+                    </li>
+
+                    <li>
+                        <strong>Model:</strong>
+                        {{ model_name }}
+                    </li>
+
+                    <li>
+                        <strong>Jumlah Data:</strong>
+                        {{ total_data }} Responden
+                    </li>
+
+                    <li>
+                        <strong>Data Training:</strong>
+                        {{ training_data }} Responden
+                    </li>
+
+                    <li>
+                        <strong>Data Testing:</strong>
+                        {{ testing_data }} Responden
+                    </li>
+
+                    <li>
+                        <strong>Jumlah Tree:</strong>
+                        {{ jumlah_tree }}
+                    </li>
+
+                    <li>
+                        <strong>Akurasi:</strong>
+                        {{ accuracy }}%
+                    </li>
+
+                </ul>
+
+            </div>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- UPLOAD DATASET BARU -->
+        <!-- ================================================= -->
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <h5 class="card-title mb-3">
+
+                    Upload Dataset Baru
+
+                </h5>
+
+
+                <div class="alert alert-info">
+
+                    <strong>Informasi:</strong>
+
+                    Upload dataset baru akan:
+
+                    <ul class="mb-0 mt-2">
+
+                        <li>
+                            Menyimpan CSV baru.
+                        </li>
+
+                        <li>
+                            Membuat model Random Forest baru.
+                        </li>
+
+                        <li>
+                            Menggunakan 100 Tree.
+                        </li>
+
+                        <li>
+                            Menggunakan pembagian data 80% : 20%.
+                        </li>
+
+                        <li>
+                            Membuat hasil Excel baru.
+                        </li>
+
+                        <li>
+                            Tidak mengubah
+                            <strong>model_random_forest.pkl</strong>
+                            penelitian asli.
+                        </li>
+
+                    </ul>
+
+                </div>
+
+
+                <form
+                    method="POST"
+                    enctype="multipart/form-data"
+                >
+
+                    <input
+                        type="hidden"
+                        name="action"
+                        value="upload_dataset"
+                    >
+
+
+                    <div class="row align-items-center">
+
+                        <div class="col-md-9">
+
+                            <input
+                                class="form-control"
+                                type="file"
+                                name="file_csv"
+                                accept=".csv"
+                                required
+                            >
+
+                        </div>
+
+
+                        <div class="col-md-3">
+
+                            <button
+                                class="btn btn-success w-100"
+                                type="submit"
+                            >
+
+                                Upload & Training
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </form>
+
+
+                <div class="mt-3">
+
+                    <small class="text-muted">
+
+                        Format CSV:
+
+                        <strong>
+                            Skor_X1,
+                            Skor_X2,
+                            Skor_X3,
+                            Skor_X4,
+                            LABEL
+                        </strong>
+
+                    </small>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- DATASET YANG SUDAH TERSIMPAN -->
+        <!-- ================================================= -->
+
+        <div class="card shadow-sm mt-4">
+
+            <div class="card-body">
+
+                <h5 class="card-title mb-3">
+
+                    Dataset Tersimpan
+
+                </h5>
+
+
+                <div class="table-responsive">
+
+                    <table class="table table-bordered table-hover">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    Dataset
+                                </th>
+
+                                <th>
+                                    File
+                                </th>
+
+                                <th>
+                                    Jumlah Data
+                                </th>
+
+                                <th>
+                                    Akurasi
+                                </th>
+
+                                <th>
+                                    Status
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody>
+
+                            {% for item in dataset_list %}
+
+                            <tr>
+
+                                <td>
+                                    {{ item.name }}
+                                </td>
+
+                                <td>
+                                    {{ item.file }}
+                                </td>
+
+                                <td>
+
+                                    {% if item.total_data %}
+                                    {{ item.total_data }}
+                                    {% else %}
+                                    Data Penelitian
+                                    {% endif %}
+
+                                </td>
+
+                                <td>
+
+                                    {% if item.accuracy is not none %}
+
+                                    {{ "%.2f"|format(item.accuracy * 100) }}%
+
+                                    {% else %}
+
+                                    -
+
+                                    {% endif %}
+
+                                </td>
+
+                                <td>
+
+                                    {% if item.id == active_dataset %}
+
+                                    <span class="badge bg-success">
+                                        Aktif
+                                    </span>
+
+                                    {% else %}
+
+                                    <span class="badge bg-secondary">
+                                        Tersimpan
+                                    </span>
+
+                                    {% endif %}
+
+                                </td>
+
+                            </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
     </div>
+
 </div>
+
 {% endblock %}

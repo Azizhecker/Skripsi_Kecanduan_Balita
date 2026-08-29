@@ -1,14 +1,11 @@
 import os
 import io
+import json
+import uuid
 import base64
 import warnings
 
 warnings.filterwarnings("ignore")
-
-
-# ============================================================
-# IMPORT FLASK
-# ============================================================
 
 from flask import (
     Flask,
@@ -16,79 +13,62 @@ from flask import (
     request,
     redirect,
     url_for,
-    session,
-    flash
+    flash,
+    session
 )
 
-
-# ============================================================
-# IMPORT DATA SCIENCE
-# ============================================================
+from werkzeug.utils import secure_filename
+from werkzeug.security import check_password_hash
 
 import pandas as pd
 import numpy as np
 import joblib
-
-
-# ============================================================
-# MYSQL
-# ============================================================
-
 import mysql.connector
 
-
-# ============================================================
-# VISUALISASI
-# ============================================================
-
 import matplotlib
-
 matplotlib.use("Agg")
-
 import matplotlib.pyplot as plt
-import seaborn as sns
 
-
-# ============================================================
-# MACHINE LEARNING
-# ============================================================
-
-from sklearn.metrics import (
-    confusion_matrix,
-    classification_report,
-    accuracy_score
-)
-
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    classification_report
+)
 from sklearn.tree import plot_tree
 
 
 # ============================================================
-# FLASK CONFIG
+# FLASK
 # ============================================================
 
 app = Flask(__name__)
-
-app.secret_key = "skripsi_balita_super_secret_key"
+app.secret_key = "skripsi_kecanduan_balita_secret_key"
 
 
 # ============================================================
-# PATH
+# PATH PROJECT
 # ============================================================
 
 BASE_DIR = os.path.dirname(
     os.path.abspath(__file__)
 )
 
-MODEL_PATH = os.path.join(
-    BASE_DIR,
-    "model_random_forest.pkl"
-)
+
+# ============================================================
+# DATA PENELITIAN ASLI
+# JANGAN DITIMPA
+# ============================================================
 
 CSV_PATH = os.path.join(
     BASE_DIR,
     "tabulasi data2.csv"
+)
+
+MODEL_PATH = os.path.join(
+    BASE_DIR,
+    "model_random_forest.pkl"
 )
 
 EXCEL_PATH = os.path.join(
@@ -98,53 +78,56 @@ EXCEL_PATH = os.path.join(
 
 
 # ============================================================
-# LOAD MODEL
+# FOLDER DATASET BARU
 # ============================================================
 
-if not os.path.exists(MODEL_PATH):
+DATASET_DIR = os.path.join(
+    BASE_DIR,
+    "datasets"
+)
 
-    raise FileNotFoundError(
-        "model_random_forest.pkl tidak ditemukan. "
-        "Jalankan train.py terlebih dahulu."
-    )
+MODEL_DIR = os.path.join(
+    BASE_DIR,
+    "models"
+)
 
+EXCEL_DIR = os.path.join(
+    BASE_DIR,
+    "hasil_excel"
+)
 
-model_data = joblib.load(
-    MODEL_PATH
+REGISTRY_PATH = os.path.join(
+    BASE_DIR,
+    "dataset_registry.json"
 )
 
 
-# Model
-model = model_data["model"]
-
-
-# Fitur yang digunakan model
-feature_cols = model_data.get(
-    "feature_cols",
-    [
-        "Skor_X1",
-        "Skor_X2",
-        "Skor_X3",
-        "Skor_X4"
-    ]
-)
-
-
-print("=" * 60)
-print("MODEL RANDOM FOREST BERHASIL DIMUAT")
-print("=" * 60)
-
-print("Model :", type(model).__name__)
-
-print("Fitur :")
-for fitur in feature_cols:
-    print("-", fitur)
-
-print("Jumlah fitur:", len(feature_cols))
+os.makedirs(DATASET_DIR, exist_ok=True)
+os.makedirs(MODEL_DIR, exist_ok=True)
+os.makedirs(EXCEL_DIR, exist_ok=True)
 
 
 # ============================================================
-# DATABASE CONFIG
+# FITUR RANDOM FOREST
+# ============================================================
+
+FEATURE_COLS = [
+    "Skor_X1",
+    "Skor_X2",
+    "Skor_X3",
+    "Skor_X4"
+]
+
+
+LABELS = [
+    "RENDAH",
+    "SEDANG",
+    "TINGGI"
+]
+
+
+# ============================================================
+# DATABASE
 # ============================================================
 
 db_config = {
@@ -158,88 +141,316 @@ db_config = {
 def get_db_connection():
 
     try:
-
         return mysql.connector.connect(
             **db_config
         )
 
-    except Exception:
+    except Exception as e:
+
+        print(
+            "Database tidak tersedia:",
+            e
+        )
 
         return None
 
 
 # ============================================================
-# FIGURE → BASE64
+# LOAD MODEL ASLI
+# ============================================================
+
+if not os.path.exists(MODEL_PATH):
+
+    raise FileNotFoundError(
+        "model_random_forest.pkl tidak ditemukan. "
+        "Pastikan file model penelitian asli berada "
+        "di folder project."
+    )
+
+
+model_data = joblib.load(
+    MODEL_PATH
+)
+
+
+if isinstance(model_data, dict):
+
+    original_model = model_data["model"]
+
+else:
+
+    original_model = model_data
+
+
+print("=" * 60)
+print("MODEL PENELITIAN ASLI")
+print("=" * 60)
+print(
+    "Tipe model   :",
+    type(original_model).__name__
+)
+print(
+    "Jumlah tree  :",
+    getattr(
+        original_model,
+        "n_estimators",
+        100
+    )
+)
+print("=" * 60)
+
+
+# ============================================================
+# DATASET AKTIF
+# ============================================================
+
+active_dataset_id = "original"
+
+
+# ============================================================
+# REGISTRY DATASET
+# ============================================================
+
+def load_registry():
+
+    if not os.path.exists(
+        REGISTRY_PATH
+    ):
+        return []
+
+    try:
+
+        with open(
+            REGISTRY_PATH,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            return json.load(f)
+
+    except Exception:
+
+        return []
+
+
+def save_registry(data):
+
+    with open(
+        REGISTRY_PATH,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            data,
+            f,
+            indent=4,
+            ensure_ascii=False
+        )
+
+
+def add_dataset_registry(
+    dataset_id,
+    dataset_name,
+    dataset_file,
+    model_file,
+    excel_file,
+    total_data,
+    training_data,
+    testing_data,
+    accuracy,
+    jumlah_tree
+):
+
+    registry = load_registry()
+
+    registry.append({
+
+        "id":
+            dataset_id,
+
+        "name":
+            dataset_name,
+
+        "dataset_file":
+            dataset_file,
+
+        "model_file":
+            model_file,
+
+        "excel_file":
+            excel_file,
+
+        "total_data":
+            int(total_data),
+
+        "training_data":
+            int(training_data),
+
+        "testing_data":
+            int(testing_data),
+
+        "accuracy":
+            float(accuracy),
+
+        "jumlah_tree":
+            int(jumlah_tree)
+
+    })
+
+    save_registry(
+        registry
+    )
+
+
+def get_registry_dataset(
+    dataset_id
+):
+
+    registry = load_registry()
+
+    for item in registry:
+
+        if item["id"] == dataset_id:
+
+            return item
+
+    return None
+
+
+# ============================================================
+# FIGURE BASE64
 # ============================================================
 
 def fig_to_base64(fig):
 
-    img = io.BytesIO()
+    image = io.BytesIO()
 
     fig.savefig(
-        img,
+        image,
         format="png",
         bbox_inches="tight",
         dpi=120
     )
 
-    img.seek(0)
+    image.seek(0)
 
     return base64.b64encode(
-        img.getvalue()
+        image.getvalue()
     ).decode("utf-8")
 
 
 # ============================================================
-# HELPER:
-# LOAD DAN PROCESS DATA
+# LOAD DAN PROSES DATASET
 # ============================================================
 
-def load_processed_data():
+def load_processed_data(
+    csv_path
+):
 
-    if not os.path.exists(CSV_PATH):
+    if not os.path.exists(
+        csv_path
+    ):
 
         return None, None, None
 
 
-    # --------------------------------------------------------
-    # BACA CSV
-    # --------------------------------------------------------
-
     df = pd.read_csv(
-        CSV_PATH
+        csv_path
     )
 
 
-    # --------------------------------------------------------
-    # RENAME KOLOM
-    # --------------------------------------------------------
+    # ========================================================
+    # DATA BARU
+    # SUDAH MEMILIKI Skor_X1-X4 DAN LABEL
+    # ========================================================
 
-    df = df.rename(columns={
+    if all(
+        col in df.columns
+        for col in FEATURE_COLS + ["LABEL"]
+    ):
 
-        "Unnamed: 0":
-            "No_Responden",
+        if "No_Responden" not in df.columns:
 
-        "Unnamed: 21":
-            "SKOR_TOTAL_Y",
-
-        "Unnamed: 22":
-            "LABEL"
-    })
-
-
-    # --------------------------------------------------------
-    # HAPUS DATA LABEL KOSONG
-    # --------------------------------------------------------
-
-    df = df.dropna(
-        subset=["LABEL"]
-    ).reset_index(drop=True)
+            df.insert(
+                0,
+                "No_Responden",
+                range(
+                    1,
+                    len(df) + 1
+                )
+            )
 
 
-    # --------------------------------------------------------
-    # ITEM X1
-    # --------------------------------------------------------
+        for col in FEATURE_COLS:
+
+            df[col] = pd.to_numeric(
+                df[col],
+                errors="coerce"
+            )
+
+
+        df["LABEL"] = (
+            df["LABEL"]
+            .astype(str)
+            .str.upper()
+            .str.strip()
+        )
+
+
+        df = df.dropna(
+            subset=
+            FEATURE_COLS + ["LABEL"]
+        ).reset_index(
+            drop=True
+        )
+
+
+        X = df[
+            FEATURE_COLS
+        ].copy()
+
+        y = df["LABEL"].copy()
+
+
+        return df, X, y
+
+
+    # ========================================================
+    # DATA ASLI
+    # ========================================================
+
+    df = df.rename(
+        columns={
+
+            "Unnamed: 0":
+                "No_Responden",
+
+            "TOTAL X1":
+                "Skor_X1",
+
+            "TOTAL X2":
+                "Skor_X2",
+
+            "TOTAL X3":
+                "Skor_X3",
+
+            "TOTAL X4":
+                "Skor_X4",
+
+            "Unnamed: 21":
+                "SKOR_TOTAL_Y",
+
+            "Unnamed: 22":
+                "LABEL"
+        }
+    )
+
+
+    # ========================================================
+    # JIKA SKOR X BELUM ADA
+    # HITUNG DARI ITEM
+    # ========================================================
 
     x1_cols = [
         "X1.1",
@@ -247,21 +458,11 @@ def load_processed_data():
         "X1.3"
     ]
 
-
-    # --------------------------------------------------------
-    # ITEM X2
-    # --------------------------------------------------------
-
     x2_cols = [
         "X2.1",
         "X2.2",
         "X2.3"
     ]
-
-
-    # --------------------------------------------------------
-    # ITEM X3
-    # --------------------------------------------------------
 
     x3_cols = [
         "X3.1",
@@ -269,21 +470,11 @@ def load_processed_data():
         "X3.3"
     ]
 
-
-    # --------------------------------------------------------
-    # ITEM X4
-    # --------------------------------------------------------
-
     x4_cols = [
         "X4.1",
         "X4.2",
         "X4.3"
     ]
-
-
-    # --------------------------------------------------------
-    # ITEM Y
-    # --------------------------------------------------------
 
     y_cols = [
         "Y1",
@@ -293,147 +484,754 @@ def load_processed_data():
     ]
 
 
-    # --------------------------------------------------------
-    # HITUNG SKOR X1-X4
-    # --------------------------------------------------------
+    if all(
+        col in df.columns
+        for col in x1_cols
+    ):
 
-    df["Skor_X1"] = (
-        df[x1_cols]
-        .sum(axis=1)
+        df["Skor_X1"] = (
+            df[x1_cols]
+            .sum(axis=1)
+        )
+
+
+    if all(
+        col in df.columns
+        for col in x2_cols
+    ):
+
+        df["Skor_X2"] = (
+            df[x2_cols]
+            .sum(axis=1)
+        )
+
+
+    if all(
+        col in df.columns
+        for col in x3_cols
+    ):
+
+        df["Skor_X3"] = (
+            df[x3_cols]
+            .sum(axis=1)
+        )
+
+
+    if all(
+        col in df.columns
+        for col in x4_cols
+    ):
+
+        df["Skor_X4"] = (
+            df[x4_cols]
+            .sum(axis=1)
+        )
+
+
+    if all(
+        col in df.columns
+        for col in y_cols
+    ):
+
+        df["Total_Y"] = (
+            df[y_cols]
+            .sum(axis=1)
+        )
+
+
+    # ========================================================
+    # VALIDASI
+    # ========================================================
+
+    required = (
+        FEATURE_COLS + ["LABEL"]
     )
 
-    df["Skor_X2"] = (
-        df[x2_cols]
-        .sum(axis=1)
-    )
-
-    df["Skor_X3"] = (
-        df[x3_cols]
-        .sum(axis=1)
-    )
-
-    df["Skor_X4"] = (
-        df[x4_cols]
-        .sum(axis=1)
-    )
-
-
-    # --------------------------------------------------------
-    # HITUNG TOTAL Y
-    # --------------------------------------------------------
-
-    df["Total_Y"] = (
-        df[y_cols]
-        .sum(axis=1)
-    )
-
-
-    # --------------------------------------------------------
-    # FITUR MODEL
-    # --------------------------------------------------------
-
-    X = df[
-        [
-            "Skor_X1",
-            "Skor_X2",
-            "Skor_X3",
-            "Skor_X4"
-        ]
+    missing = [
+        col
+        for col in required
+        if col not in df.columns
     ]
 
 
-    # --------------------------------------------------------
-    # TARGET
-    # --------------------------------------------------------
+    if missing:
 
-    y = df["LABEL"]
+        raise ValueError(
+            "Kolom tidak ditemukan: "
+            + ", ".join(missing)
+        )
+
+
+    df = df.dropna(
+        subset=required
+    ).reset_index(
+        drop=True
+    )
+
+
+    for col in FEATURE_COLS:
+
+        df[col] = pd.to_numeric(
+            df[col],
+            errors="coerce"
+        )
+
+
+    df = df.dropna(
+        subset=FEATURE_COLS
+    ).reset_index(
+        drop=True
+    )
+
+
+    X = df[
+        FEATURE_COLS
+    ].copy()
+
+    y = (
+        df["LABEL"]
+        .astype(str)
+        .str.upper()
+        .str.strip()
+    )
 
 
     return df, X, y
 
 
 # ============================================================
-# ROUTE 1
-# DASHBOARD
+# DATASET AKTIF
 # ============================================================
 
-@app.route("/")
-def dashboard():
+def get_active_dataset():
 
-    df_raw, X, y = (
-        load_processed_data()
+    dataset_id = session.get(
+        "active_dataset",
+        "original"
     )
 
 
-    if df_raw is None:
+    # ========================================================
+    # DATA ASLI
+    # ========================================================
 
-        return (
-            "File tabulasi data2.csv "
-            "tidak ditemukan."
+    if dataset_id == "original":
+
+        df, X, y = (
+            load_processed_data(
+                CSV_PATH
+            )
+        )
+
+
+        return {
+
+            "id":
+                "original",
+
+            "name":
+                "Data Penelitian Asli",
+
+            "dataset_file":
+                "tabulasi data2.csv",
+
+            "model_file":
+                "model_random_forest.pkl",
+
+            "excel_file":
+                os.path.basename(
+                    EXCEL_PATH
+                ),
+
+            "csv_path":
+                CSV_PATH,
+
+            "model_path":
+                MODEL_PATH,
+
+            "excel_path":
+                EXCEL_PATH,
+
+            "df":
+                df,
+
+            "X":
+                X,
+
+            "y":
+                y,
+
+            "model":
+                original_model
+        }
+
+
+    # ========================================================
+    # DATA BARU
+    # ========================================================
+
+    info = get_registry_dataset(
+        dataset_id
+    )
+
+
+    if info is None:
+
+        session[
+            "active_dataset"
+        ] = "original"
+
+        return get_active_dataset()
+
+
+    csv_path = os.path.join(
+        DATASET_DIR,
+        info["dataset_file"]
+    )
+
+    model_path = os.path.join(
+        MODEL_DIR,
+        info["model_file"]
+    )
+
+    excel_path = os.path.join(
+        EXCEL_DIR,
+        info["excel_file"]
+    )
+
+
+    if not os.path.exists(
+        csv_path
+    ):
+
+        session[
+            "active_dataset"
+        ] = "original"
+
+        return get_active_dataset()
+
+
+    if not os.path.exists(
+        model_path
+    ):
+
+        session[
+            "active_dataset"
+        ] = "original"
+
+        return get_active_dataset()
+
+
+    df, X, y = (
+        load_processed_data(
+            csv_path
+        )
+    )
+
+
+    saved_model = joblib.load(
+        model_path
+    )
+
+
+    if isinstance(
+        saved_model,
+        dict
+    ):
+
+        active_model = (
+            saved_model["model"]
+        )
+
+    else:
+
+        active_model = saved_model
+
+
+    return {
+
+        "id":
+            dataset_id,
+
+        "name":
+            info["name"],
+
+        "dataset_file":
+            info["dataset_file"],
+
+        "model_file":
+            info["model_file"],
+
+        "excel_file":
+            info["excel_file"],
+
+        "csv_path":
+            csv_path,
+
+        "model_path":
+            model_path,
+
+        "excel_path":
+            excel_path,
+
+        "df":
+            df,
+
+        "X":
+            X,
+
+        "y":
+            y,
+
+        "model":
+            active_model
+    }
+
+
+# ============================================================
+# TRAINING DATA BARU
+# ============================================================
+
+def train_new_dataset(
+    uploaded_file
+):
+
+    # --------------------------------------------------------
+    # ID UNIK
+    # --------------------------------------------------------
+
+    dataset_id = (
+        "dataset_"
+        + uuid.uuid4().hex[:8]
+    )
+
+
+    original_filename = secure_filename(
+        uploaded_file.filename
+    )
+
+
+    dataset_name = os.path.splitext(
+        original_filename
+    )[0]
+
+
+    dataset_filename = (
+        dataset_id
+        + ".csv"
+    )
+
+
+    model_filename = (
+        dataset_id
+        + "_model.pkl"
+    )
+
+
+    excel_filename = (
+        dataset_id
+        + "_hasil.xlsx"
+    )
+
+
+    csv_path = os.path.join(
+        DATASET_DIR,
+        dataset_filename
+    )
+
+    model_path = os.path.join(
+        MODEL_DIR,
+        model_filename
+    )
+
+    excel_path = os.path.join(
+        EXCEL_DIR,
+        excel_filename
+    )
+
+
+    # --------------------------------------------------------
+    # SIMPAN CSV
+    # --------------------------------------------------------
+
+    uploaded_file.save(
+        csv_path
+    )
+
+
+    # --------------------------------------------------------
+    # BACA DATA
+    # --------------------------------------------------------
+
+    df, X, y = (
+        load_processed_data(
+            csv_path
+        )
+    )
+
+
+    if df is None:
+
+        raise ValueError(
+            "Dataset tidak dapat dibaca."
+        )
+
+
+    if len(df) < 10:
+
+        raise ValueError(
+            "Data minimal 10 responden."
+        )
+
+
+    if y.nunique() < 2:
+
+        raise ValueError(
+            "LABEL minimal harus memiliki "
+            "2 kategori."
         )
 
 
     # --------------------------------------------------------
-    # SPLIT HARUS SAMA DENGAN JUPYTER
+    # SPLIT 80:20
     # --------------------------------------------------------
 
     X_train, X_test, y_train, y_test = (
         train_test_split(
-
             X,
             y,
-
             test_size=0.20,
-
             random_state=42,
-
             stratify=y
         )
     )
 
 
     # --------------------------------------------------------
-    # PREDIKSI
+    # RANDOM FOREST
     # --------------------------------------------------------
 
-    y_pred = model.predict(
+    new_model = RandomForestClassifier(
+
+        n_estimators=100,
+
+        random_state=42
+
+    )
+
+
+    print("=" * 60)
+    print("TRAINING DATASET BARU")
+    print("=" * 60)
+    print(
+        "Dataset      :",
+        original_filename
+    )
+    print(
+        "Jumlah data  :",
+        len(df)
+    )
+    print(
+        "Training     :",
+        len(X_train)
+    )
+    print(
+        "Testing      :",
+        len(X_test)
+    )
+    print(
+        "Jumlah tree  :",
+        new_model.n_estimators
+    )
+
+
+    new_model.fit(
+        X_train,
+        y_train
+    )
+
+
+    # --------------------------------------------------------
+    # EVALUASI
+    # --------------------------------------------------------
+
+    y_pred = new_model.predict(
         X_test
     )
 
 
-    # --------------------------------------------------------
-    # ACCURACY
-    # --------------------------------------------------------
+    accuracy = accuracy_score(
+        y_test,
+        y_pred
+    )
 
-    acc = (
-        accuracy_score(
-            y_test,
-            y_pred
-        ) * 100
+
+    labels = list(
+        new_model.classes_
+    )
+
+
+    cm = confusion_matrix(
+        y_test,
+        y_pred,
+        labels=labels
+    )
+
+
+    report = classification_report(
+        y_test,
+        y_pred,
+        labels=labels,
+        output_dict=True,
+        zero_division=0
     )
 
 
     # --------------------------------------------------------
-    # CLASSIFICATION REPORT
+    # PREDIKSI SELURUH DATA
     # --------------------------------------------------------
 
-    labels = [
-        "RENDAH",
-        "SEDANG",
-        "TINGGI"
-    ]
+    df_hasil = df.copy()
+
+
+    df_hasil[
+        "PREDIKSI_RF"
+    ] = new_model.predict(
+        X
+    )
+
+
+    # --------------------------------------------------------
+    # SIMPAN MODEL
+    # --------------------------------------------------------
+
+    joblib.dump(
+        new_model,
+        model_path
+    )
+
+
+    # --------------------------------------------------------
+    # SIMPAN EXCEL
+    # --------------------------------------------------------
+
+    with pd.ExcelWriter(
+        excel_path,
+        engine="openpyxl"
+    ) as writer:
+
+        df_hasil.to_excel(
+            writer,
+            sheet_name="Hasil Prediksi",
+            index=False
+        )
+
+
+        pd.DataFrame(
+            cm,
+            index=labels,
+            columns=labels
+        ).to_excel(
+            writer,
+            sheet_name="Confusion Matrix"
+        )
+
+
+        pd.DataFrame(
+            report
+        ).transpose().to_excel(
+            writer,
+            sheet_name="Classification Report"
+        )
+
+
+        pd.DataFrame({
+
+            "Keterangan": [
+
+                "Dataset",
+
+                "Jumlah Data",
+
+                "Data Training",
+
+                "Data Testing",
+
+                "Jumlah Tree",
+
+                "Random State",
+
+                "Akurasi"
+
+            ],
+
+            "Nilai": [
+
+                original_filename,
+
+                len(df),
+
+                len(X_train),
+
+                len(X_test),
+
+                new_model.n_estimators,
+
+                new_model.random_state,
+
+                accuracy
+
+            ]
+
+        }).to_excel(
+            writer,
+            sheet_name="Ringkasan",
+            index=False
+        )
+
+
+    # --------------------------------------------------------
+    # REGISTRY
+    # --------------------------------------------------------
+
+    add_dataset_registry(
+
+        dataset_id=
+            dataset_id,
+
+        dataset_name=
+            dataset_name,
+
+        dataset_file=
+            dataset_filename,
+
+        model_file=
+            model_filename,
+
+        excel_file=
+            excel_filename,
+
+        total_data=
+            len(df),
+
+        training_data=
+            len(X_train),
+
+        testing_data=
+            len(X_test),
+
+        accuracy=
+            accuracy,
+
+        jumlah_tree=
+            new_model.n_estimators
+
+    )
+
+
+    print("=" * 60)
+    print("TRAINING SELESAI")
+    print("=" * 60)
+    print(
+        "Akurasi :",
+        f"{accuracy * 100:.2f}%"
+    )
+    print(
+        "Model   :",
+        model_path
+    )
+    print(
+        "Excel   :",
+        excel_path
+    )
+
+
+    return {
+        "id":
+            dataset_id,
+
+        "accuracy":
+            accuracy,
+
+        "total_data":
+            len(df),
+
+        "training_data":
+            len(X_train),
+
+        "testing_data":
+            len(X_test)
+    }
+
+
+# ============================================================
+# DASHBOARD
+# ============================================================
+
+@app.route("/")
+def dashboard():
+
+    dataset = (
+        get_active_dataset()
+    )
+
+
+    if dataset["df"] is None:
+
+        return (
+            "Dataset tidak ditemukan."
+        )
+
+
+    df = dataset["df"]
+    X = dataset["X"]
+    y = dataset["y"]
+    active_model = dataset["model"]
+
+
+    # --------------------------------------------------------
+    # SPLIT UNTUK EVALUASI
+    # --------------------------------------------------------
+
+    X_train, X_test, y_train, y_test = (
+        train_test_split(
+            X,
+            y,
+            test_size=0.20,
+            random_state=42,
+            stratify=y
+        )
+    )
+
+
+    y_pred = active_model.predict(
+        X_test
+    )
+
+
+    accuracy = accuracy_score(
+        y_test,
+        y_pred
+    )
+
+
+    labels = list(
+        active_model.classes_
+    )
+
+
+    cm = confusion_matrix(
+        y_test,
+        y_pred,
+        labels=labels
+    )
 
 
     report = classification_report(
-
         y_test,
-
         y_pred,
-
         labels=labels,
-
         output_dict=True,
-
         zero_division=0
     )
 
@@ -449,48 +1247,49 @@ def dashboard():
     # CONFUSION MATRIX
     # --------------------------------------------------------
 
-    cm = confusion_matrix(
-
-        y_test,
-
-        y_pred,
-
-        labels=labels
-    )
-
-
-    # --------------------------------------------------------
-    # GRAFIK CONFUSION MATRIX
-    # --------------------------------------------------------
-
     fig1, ax1 = plt.subplots(
         figsize=(5, 4)
     )
 
 
-    sns.heatmap(
-
-        cm,
-
-        annot=True,
-
-        fmt="d",
-
-        cmap="Blues",
-
-        xticklabels=labels,
-
-        yticklabels=labels,
-
-        ax=ax1
+    image = ax1.imshow(
+        cm
     )
 
 
-    ax1.set_title(
-        "Confusion Matrix",
-        fontsize=12,
-        fontweight="bold"
+    ax1.set_xticks(
+        range(len(labels))
     )
+
+    ax1.set_yticks(
+        range(len(labels))
+    )
+
+    ax1.set_xticklabels(
+        labels
+    )
+
+    ax1.set_yticklabels(
+        labels
+    )
+
+
+    for i in range(
+        len(labels)
+    ):
+
+        for j in range(
+            len(labels)
+        ):
+
+            ax1.text(
+                j,
+                i,
+                cm[i, j],
+                ha="center",
+                va="center"
+            )
+
 
     ax1.set_xlabel(
         "Prediksi Model"
@@ -500,18 +1299,37 @@ def dashboard():
         "Kelas Aktual"
     )
 
+    ax1.set_title(
+        "Confusion Matrix"
+    )
+
 
     img_cm_heatmap = (
         fig_to_base64(fig1)
     )
 
-
     plt.close(fig1)
 
 
     # --------------------------------------------------------
-    # BAR CHART AKTUAL VS PREDIKSI
+    # BAR CHART
     # --------------------------------------------------------
+
+    actual_counts = [
+        np.sum(
+            y_test == label
+        )
+        for label in labels
+    ]
+
+
+    pred_counts = [
+        np.sum(
+            y_pred == label
+        )
+        for label in labels
+    ]
+
 
     fig2, ax2 = plt.subplots(
         figsize=(6, 4)
@@ -526,46 +1344,18 @@ def dashboard():
     width = 0.35
 
 
-    actual_counts = [
-
-        np.sum(
-            y_test == label
-        )
-
-        for label in labels
-    ]
-
-
-    pred_counts = [
-
-        np.sum(
-            y_pred == label
-        )
-
-        for label in labels
-    ]
-
-
     ax2.bar(
-
         x_indices - width / 2,
-
         actual_counts,
-
         width,
-
         label="Aktual"
     )
 
 
     ax2.bar(
-
         x_indices + width / 2,
-
         pred_counts,
-
         width,
-
         label="Prediksi"
     )
 
@@ -578,18 +1368,13 @@ def dashboard():
         labels
     )
 
-
-    ax2.set_title(
-        "Perbandingan Aktual vs Prediksi",
-        fontsize=12,
-        fontweight="bold"
-    )
-
-
     ax2.set_ylabel(
         "Jumlah Responden"
     )
 
+    ax2.set_title(
+        "Perbandingan Aktual vs Prediksi"
+    )
 
     ax2.legend()
 
@@ -598,85 +1383,86 @@ def dashboard():
         fig_to_base64(fig2)
     )
 
-
     plt.close(fig2)
 
-
-    # --------------------------------------------------------
-    # MODAL
-    # --------------------------------------------------------
-
-    show_modal = session.pop(
-        "show_modal",
-        True
-    )
-
-
-    # --------------------------------------------------------
-    # RENDER
-    # --------------------------------------------------------
 
     return render_template(
 
         "dashboard.html",
 
-        accuracy=f"{acc:.2f}",
+        accuracy=
+            f"{accuracy * 100:.2f}",
 
         report_table=
-        report_df.to_html(
-            classes=
-            "table table-hover table-striped align-middle",
-            border=0
-        ),
+            report_df.to_html(
+                classes=
+                "table table-hover "
+                "table-striped "
+                "align-middle",
+                border=0
+            ),
 
         img_cm_heatmap=
-        img_cm_heatmap,
+            img_cm_heatmap,
 
         img_cm_bar=
-        img_cm_bar,
+            img_cm_bar,
 
-        show_modal=
-        show_modal
+        model_name=
+            dataset["name"],
+
+        total_data=
+            len(df),
+
+        training_data=
+            len(X_train),
+
+        testing_data=
+            len(X_test),
+
+        jumlah_tree=
+            getattr(
+                active_model,
+                "n_estimators",
+                100
+            )
     )
 
 
 # ============================================================
-# ROUTE 2
 # TABULASI
 # ============================================================
 
 @app.route("/tabulasi")
 def tabulasi():
 
-    if os.path.exists(
-        CSV_PATH
-    ):
+    dataset = (
+        get_active_dataset()
+    )
 
-        df = pd.read_csv(
-            CSV_PATH
+
+    df = dataset["df"]
+
+
+    if df is None:
+
+        return (
+            "Dataset tidak ditemukan."
         )
 
 
-        table_html = df.to_html(
+    table_html = df.to_html(
 
-            classes=
-            "table table-bordered "
-            "table-hover "
-            "table-striped "
-            "text-center "
-            "align-middle",
+        classes=
+        "table table-bordered "
+        "table-hover "
+        "table-striped "
+        "text-center "
+        "align-middle",
 
-            index=False
-        )
+        index=False
 
-    else:
-
-        table_html = (
-            "<p class='text-danger'>"
-            "File tabulasi data2.csv "
-            "tidak ditemukan."
-            "</p>"
-        )
+    )
 
 
     return render_template(
@@ -684,51 +1470,63 @@ def tabulasi():
         "tabulasi.html",
 
         table_html=
-        table_html
+            table_html
+
     )
 
 
 # ============================================================
-# ROUTE 3
-# SKOR X1-X4 DAN TARGET
+# SKOR TARGET
 # ============================================================
 
 @app.route("/skor-target")
 def skor_target():
 
-    df_raw, X, y = (
-        load_processed_data()
+    dataset = (
+        get_active_dataset()
     )
 
 
-    if df_raw is None:
+    df = dataset["df"]
+    active_model = dataset["model"]
+
+
+    if df is None:
 
         return (
             "Dataset tidak ditemukan."
         )
 
 
-    # --------------------------------------------------------
-    # TABEL SKOR
-    # --------------------------------------------------------
+    columns = [
 
-    df_skor = df_raw[
+        "No_Responden",
 
-        [
-            "No_Responden",
+        "Skor_X1",
 
-            "Skor_X1",
+        "Skor_X2",
 
-            "Skor_X2",
+        "Skor_X3",
 
-            "Skor_X3",
+        "Skor_X4"
 
-            "Skor_X4",
+    ]
 
-            "Total_Y",
 
-            "LABEL"
-        ]
+    if "Total_Y" in df.columns:
+
+        columns.append(
+            "Total_Y"
+        )
+
+
+    columns.append(
+        "LABEL"
+    )
+
+
+    df_skor = df[
+        columns
     ]
 
 
@@ -742,24 +1540,24 @@ def skor_target():
             "align-middle",
 
             index=False
+
         )
     )
 
 
-    # --------------------------------------------------------
-    # TARGET
-    # --------------------------------------------------------
-
     target_counts = (
-        y.value_counts()
-        .to_frame()
+        df["LABEL"]
+        .value_counts()
         .reset_index()
     )
 
 
     target_counts.columns = [
+
         "Kategori Target",
+
         "Jumlah Responden"
+
     ]
 
 
@@ -772,37 +1570,36 @@ def skor_target():
             "align-middle",
 
             index=False
+
         )
     )
 
 
-    # --------------------------------------------------------
-    # INFORMASI MODEL
-    # --------------------------------------------------------
-
     model_info = {
 
         "nama_file":
-            "model_random_forest.pkl",
+            dataset["model_file"],
 
         "lokasi":
-            MODEL_PATH,
-
-        "ukuran_file":
-            (
-                f"{os.path.getsize(MODEL_PATH) / 1024:.2f} KB"
-                if os.path.exists(MODEL_PATH)
-                else "Tidak ditemukan"
-            ),
+            dataset["model_path"],
 
         "tipe_model":
-            type(model).__name__,
+            type(active_model).__name__,
 
         "jumlah_pohon":
-            model.n_estimators,
+            getattr(
+                active_model,
+                "n_estimators",
+                100
+            ),
 
         "random_state":
-            model.random_state
+            getattr(
+                active_model,
+                "random_state",
+                42
+            )
+
     }
 
 
@@ -811,30 +1608,54 @@ def skor_target():
         "skor_target.html",
 
         skor_table=
-        skor_table,
+            skor_table,
 
         target_table=
-        target_table,
+            target_table,
 
         model_info=
-        model_info
+            model_info
+
     )
 
 
 # ============================================================
-# ROUTE 4
-# HASIL EXCEL
+# EXCEL VIEW
 # ============================================================
 
 @app.route("/excel-view")
 def excel_view():
 
-    if os.path.exists(
-        EXCEL_PATH
+    dataset = (
+        get_active_dataset()
+    )
+
+
+    excel_path = (
+        dataset["excel_path"]
+    )
+
+
+    if not os.path.exists(
+        excel_path
     ):
 
+        return render_template(
+
+            "excel_view.html",
+
+            excel_table=
+            "<p class='text-danger'>"
+            "File Excel belum dibuat."
+            "</p>"
+
+        )
+
+
+    try:
+
         df_excel = pd.read_excel(
-            EXCEL_PATH
+            excel_path
         )
 
 
@@ -849,16 +1670,21 @@ def excel_view():
                 "text-center",
 
                 index=False
+
             )
         )
 
-    else:
+
+    except Exception as e:
 
         excel_table = (
+
             "<p class='text-danger'>"
-            "Hasil_Klasifikasi_Responden_RF.xlsx "
-            "belum dibuat."
+
+            f"Gagal membaca Excel: {e}"
+
             "</p>"
+
         )
 
 
@@ -867,12 +1693,12 @@ def excel_view():
         "excel_view.html",
 
         excel_table=
-        excel_table
+            excel_table
+
     )
 
 
 # ============================================================
-# ROUTE 5
 # DIAGNOSA
 # ============================================================
 
@@ -883,226 +1709,242 @@ def excel_view():
 def diagnosa():
 
     hasil = None
-
     probabilitas = None
-
     evaluasi = None
+
+
+    dataset = (
+        get_active_dataset()
+    )
+
+
+    active_model = (
+        dataset["model"]
+    )
 
 
     if request.method == "POST":
 
-        # ----------------------------------------------------
-        # INPUT SKOR
-        # ----------------------------------------------------
+        try:
 
-        x1 = float(
-            request.form["x1"]
-        )
+            x1 = float(
+                request.form["x1"]
+            )
 
-        x2 = float(
-            request.form["x2"]
-        )
+            x2 = float(
+                request.form["x2"]
+            )
 
-        x3 = float(
-            request.form["x3"]
-        )
+            x3 = float(
+                request.form["x3"]
+            )
 
-        x4 = float(
-            request.form["x4"]
-        )
+            x4 = float(
+                request.form["x4"]
+            )
 
 
-        # ----------------------------------------------------
-        # DATAFRAME
-        # ----------------------------------------------------
+            input_data = pd.DataFrame({
 
-        input_data = pd.DataFrame({
+                "Skor_X1": [x1],
 
-            "Skor_X1": [x1],
+                "Skor_X2": [x2],
 
-            "Skor_X2": [x2],
+                "Skor_X3": [x3],
 
-            "Skor_X3": [x3],
+                "Skor_X4": [x4]
 
-            "Skor_X4": [x4]
-        })
+            })
 
 
-        # Pastikan urutan fitur sama
-        input_data = input_data[
-            feature_cols
-        ]
-
-
-        # ----------------------------------------------------
-        # PREDIKSI
-        # ----------------------------------------------------
-
-        prediksi = model.predict(
-            input_data
-        )[0]
-
-
-        # ----------------------------------------------------
-        # PROBABILITAS
-        # ----------------------------------------------------
-
-        probs = model.predict_proba(
-            input_data
-        )[0]
-
-
-        hasil = prediksi
-
-
-        probabilitas = dict(
-            zip(
-
-                model.classes_,
-
-                [
-                    f"{p * 100:.1f}%"
-                    for p in probs
+            input_data = (
+                input_data[
+                    FEATURE_COLS
                 ]
             )
-        )
 
 
-        # ----------------------------------------------------
-        # EVALUASI RENDAH
-        # ----------------------------------------------------
-
-        if prediksi == "RENDAH":
-
-            evaluasi = {
-
-                "status":
-                    "Aman / Normal",
-
-                "badge_color":
-                    "success",
-
-                "penjelasan":
-                    "Penggunaan smartphone pada balita masih berada dalam tingkat batas wajar dan aman.",
-
-                "evaluasi_ortu": [
-
-                    "Tetap pertahankan batasan waktu penggunaan gadget.",
-
-                    "Prioritaskan aktivitas fisik, interaksi tatap muka, dan permainan.",
-
-                    "Hindari memberikan smartphone saat waktu makan atau sebelum tidur."
-                ]
-            }
+            hasil = active_model.predict(
+                input_data
+            )[0]
 
 
-        # ----------------------------------------------------
-        # EVALUASI SEDANG
-        # ----------------------------------------------------
+            if hasattr(
+                active_model,
+                "predict_proba"
+            ):
 
-        elif prediksi == "SEDANG":
-
-            evaluasi = {
-
-                "status":
-                    "Peringatan / Perlu Pengawasan",
-
-                "badge_color":
-                    "warning",
-
-                "penjelasan":
-                    "Balita menunjukkan tanda-tanda awal ketergantungan dan perlu mendapatkan pengawasan.",
-
-                "evaluasi_ortu": [
-
-                    "Lakukan evaluasi ulang jadwal pemakaian smartphone.",
-
-                    "Tingkatkan peran aktif orang tua.",
-
-                    "Gantikan durasi layar dengan permainan edukatif."
-                ]
-            }
-
-
-        # ----------------------------------------------------
-        # EVALUASI TINGGI
-        # ----------------------------------------------------
-
-        else:
-
-            evaluasi = {
-
-                "status":
-                    "Bahaya / Risiko Tinggi",
-
-                "badge_color":
-                    "danger",
-
-                "penjelasan":
-                    "Balita terindikasi mengalami tingkat penggunaan smartphone yang tinggi.",
-
-                "evaluasi_ortu": [
-
-                    "Kurangi akses smartphone secara bertahap dan konsisten.",
-
-                    "Orang tua perlu tegas dan konsisten.",
-
-                    "Perbanyak aktivitas keluarga tanpa layar.",
-
-                    "Jika terdapat perubahan perilaku ekstrem, pertimbangkan konsultasi dengan tenaga profesional."
-                ]
-            }
-
-
-        # ----------------------------------------------------
-        # SIMPAN RIWAYAT MYSQL
-        # ----------------------------------------------------
-
-        conn = get_db_connection()
-
-
-        if conn:
-
-            try:
-
-                cursor = conn.cursor()
-
-
-                cursor.execute(
-
-                    """
-                    INSERT INTO riwayat_prediksi
-                    (
-                        skor_x1,
-                        skor_x2,
-                        skor_x3,
-                        skor_x4,
-                        hasil_prediksi
-                    )
-                    VALUES
-                    (%s, %s, %s, %s, %s)
-                    """,
-
-                    (
-                        x1,
-                        x2,
-                        x3,
-                        x4,
-                        hasil
-                    )
+                probs = (
+                    active_model
+                    .predict_proba(
+                        input_data
+                    )[0]
                 )
 
 
-                conn.commit()
+                probabilitas = dict(
 
-                cursor.close()
+                    zip(
 
-                conn.close()
+                        active_model.classes_,
+
+                        [
+                            f"{p * 100:.1f}%"
+                            for p in probs
+                        ]
+
+                    )
+
+                )
 
 
-            except Exception:
+            # ------------------------------------------------
+            # EVALUASI HASIL
+            # ------------------------------------------------
 
-                pass
+            if hasil == "RENDAH":
+
+                evaluasi = {
+
+                    "status":
+                        "Aman / Normal",
+
+                    "badge_color":
+                        "success",
+
+                    "penjelasan":
+                        "Penggunaan smartphone pada balita masih berada dalam tingkat rendah.",
+
+                    "evaluasi_ortu": [
+
+                        "Tetap pertahankan batasan waktu penggunaan gadget.",
+
+                        "Prioritaskan aktivitas fisik dan interaksi langsung.",
+
+                        "Hindari penggunaan smartphone sebelum tidur."
+
+                    ]
+
+                }
+
+
+            elif hasil == "SEDANG":
+
+                evaluasi = {
+
+                    "status":
+                        "Peringatan / Perlu Pengawasan",
+
+                    "badge_color":
+                        "warning",
+
+                    "penjelasan":
+                        "Penggunaan smartphone berada pada tingkat sedang sehingga perlu pengawasan orang tua.",
+
+                    "evaluasi_ortu": [
+
+                        "Evaluasi kembali jadwal penggunaan smartphone.",
+
+                        "Tingkatkan aktivitas bersama anak.",
+
+                        "Gantikan sebagian waktu layar dengan permainan edukatif."
+
+                    ]
+
+                }
+
+
+            else:
+
+                evaluasi = {
+
+                    "status":
+                        "Bahaya / Risiko Tinggi",
+
+                    "badge_color":
+                        "danger",
+
+                    "penjelasan":
+                        "Penggunaan smartphone berada pada tingkat tinggi dan membutuhkan perhatian lebih.",
+
+                    "evaluasi_ortu": [
+
+                        "Kurangi penggunaan smartphone secara bertahap.",
+
+                        "Orang tua perlu konsisten memberikan batasan.",
+
+                        "Perbanyak aktivitas keluarga tanpa layar.",
+
+                        "Jika terdapat perubahan perilaku yang mengkhawatirkan, pertimbangkan konsultasi dengan tenaga profesional."
+
+                    ]
+
+                }
+
+
+            # ------------------------------------------------
+            # SIMPAN RIWAYAT
+            # ------------------------------------------------
+
+            conn = (
+                get_db_connection()
+            )
+
+
+            if conn:
+
+                try:
+
+                    cursor = conn.cursor()
+
+
+                    cursor.execute(
+
+                        """
+                        INSERT INTO riwayat_prediksi
+                        (
+                            skor_x1,
+                            skor_x2,
+                            skor_x3,
+                            skor_x4,
+                            hasil_prediksi
+                        )
+                        VALUES
+                        (%s, %s, %s, %s, %s)
+                        """,
+
+                        (
+                            x1,
+                            x2,
+                            x3,
+                            x4,
+                            hasil
+                        )
+
+                    )
+
+
+                    conn.commit()
+
+                    cursor.close()
+
+                    conn.close()
+
+
+                except Exception as e:
+
+                    print(
+                        "Gagal menyimpan riwayat:",
+                        e
+                    )
+
+
+        except Exception as e:
+
+            flash(
+                f"Input tidak valid: {e}",
+                "danger"
+            )
 
 
     return render_template(
@@ -1112,36 +1954,37 @@ def diagnosa():
         hasil=hasil,
 
         probabilitas=
-        probabilitas,
+            probabilitas,
 
         evaluasi=
-        evaluasi
+            evaluasi
+
     )
 
 
 # ============================================================
-# ROUTE 6
 # FEATURE IMPORTANCE
 # ============================================================
 
-@app.route("/feature-importance")
+@app.route(
+    "/feature-importance"
+)
 def feature_importance():
 
-    importances = (
-        model.feature_importances_
+    dataset = (
+        get_active_dataset()
     )
 
 
-    fitur = [
+    active_model = (
+        dataset["model"]
+    )
 
-        "Skor_X1",
 
-        "Skor_X2",
-
-        "Skor_X3",
-
-        "Skor_X4"
-    ]
+    importances = (
+        active_model
+        .feature_importances_
+    )
 
 
     fig, ax = plt.subplots(
@@ -1150,15 +1993,13 @@ def feature_importance():
 
 
     ax.barh(
-        fitur,
+        FEATURE_COLS,
         importances
     )
 
 
     ax.set_title(
-        "Feature Importance Random Forest",
-        fontsize=12,
-        fontweight="bold"
+        "Feature Importance Random Forest"
     )
 
 
@@ -1172,22 +2013,14 @@ def feature_importance():
     )
 
 
-    # --------------------------------------------------------
-    # NILAI DI SAMPING BAR
-    # --------------------------------------------------------
-
     for i, value in enumerate(
         importances
     ):
 
         ax.text(
-
             value + 0.01,
-
             i,
-
             f"{value:.3f}",
-
             va="center"
         )
 
@@ -1207,20 +2040,34 @@ def feature_importance():
 
         "feature_importance.html",
 
-        img_fi=img_fi
+        img_fi=
+            img_fi
+
     )
 
 
 # ============================================================
-# ROUTE 7
 # DECISION TREE
 # ============================================================
 
-@app.route("/decision-tree")
+@app.route(
+    "/decision-tree"
+)
 def decision_tree():
 
+    dataset = (
+        get_active_dataset()
+    )
+
+
+    active_model = (
+        dataset["model"]
+    )
+
+
     pohon_pertama = (
-        model.estimators_[0]
+        active_model
+        .estimators_[0]
     )
 
 
@@ -1234,11 +2081,12 @@ def decision_tree():
         pohon_pertama,
 
         feature_names=
-        feature_cols,
+            FEATURE_COLS,
 
         class_names=[
             str(c)
-            for c in model.classes_
+            for c in
+            active_model.classes_
         ],
 
         filled=True,
@@ -1248,17 +2096,13 @@ def decision_tree():
         max_depth=3,
 
         ax=ax
+
     )
 
 
     ax.set_title(
-
         "Decision Tree #1 "
-        "dalam Random Forest",
-
-        fontsize=13,
-
-        fontweight="bold"
+        "dalam Random Forest"
     )
 
 
@@ -1275,12 +2119,12 @@ def decision_tree():
         "decision_tree.html",
 
         img_tree=
-        img_tree
+            img_tree
+
     )
 
 
 # ============================================================
-# ROUTE 8
 # LOGIN
 # ============================================================
 
@@ -1301,7 +2145,9 @@ def login():
         ]
 
 
-        conn = get_db_connection()
+        conn = (
+            get_db_connection()
+        )
 
 
         if conn:
@@ -1319,13 +2165,10 @@ def login():
                     SELECT *
                     FROM admin
                     WHERE username = %s
-                    AND password = %s
                     """,
 
-                    (
-                        username,
-                        password
-                    )
+                    (username,)
+
                 )
 
 
@@ -1341,30 +2184,62 @@ def login():
 
                 if admin_data:
 
-                    session[
-                        "logged_in"
-                    ] = True
-
-
-                    session[
-                        "admin_nama"
-                    ] = admin_data[
-                        "nama"
-                    ]
-
-
-                    return redirect(
-                        url_for("admin")
+                    db_password = (
+                        admin_data.get(
+                            "password",
+                            ""
+                        )
                     )
 
 
-            except Exception:
+                    valid = False
 
-                pass
+
+                    try:
+
+                        valid = check_password_hash(
+                            db_password,
+                            password
+                        )
+
+                    except Exception:
+
+                        valid = (
+                            password ==
+                            db_password
+                        )
+
+
+                    if valid:
+
+                        session[
+                            "logged_in"
+                        ] = True
+
+
+                        session[
+                            "admin_nama"
+                        ] = admin_data.get(
+                            "nama",
+                            username
+                        )
+
+
+                        return redirect(
+                            url_for("admin")
+                        )
+
+
+            except Exception as e:
+
+                print(
+                    "Login database error:",
+                    e
+                )
 
 
         # ----------------------------------------------------
-        # FALLBACK LOGIN
+        # FALLBACK
         # ----------------------------------------------------
 
         if (
@@ -1380,7 +2255,7 @@ def login():
 
             session[
                 "admin_nama"
-            ] = "Administrator Skripsi"
+            ] = "Administrator"
 
 
             return redirect(
@@ -1400,7 +2275,6 @@ def login():
 
 
 # ============================================================
-# ROUTE 9
 # ADMIN
 # ============================================================
 
@@ -1419,74 +2293,325 @@ def admin():
         )
 
 
+    # ========================================================
+    # PILIH DATASET
+    # ========================================================
+
     if request.method == "POST":
 
-        if "file_csv" in request.files:
+        action = request.form.get(
+            "action"
+        )
 
-            file = request.files[
-                "file_csv"
-            ]
+
+        # ----------------------------------------------------
+        # PILIH DATASET
+        # ----------------------------------------------------
+
+        if action == "select_dataset":
+
+            selected_id = (
+                request.form.get(
+                    "dataset_id"
+                )
+            )
 
 
             if (
-                file
-                and
-                file.filename.endswith(
-                    ".csv"
+                selected_id == "original"
+                or
+                get_registry_dataset(
+                    selected_id
                 )
             ):
 
-                file.save(
-                    CSV_PATH
-                )
-
-
-                # --------------------------------------------
-                # BACA DATA BARU
-                # --------------------------------------------
-
-                df_raw, X, y = (
-                    load_processed_data()
-                )
-
-
-                # --------------------------------------------
-                # PREDIKSI
-                # --------------------------------------------
-
-                df_raw[
-                    "PREDIKSI_RF"
-                ] = model.predict(X)
-
-
-                # --------------------------------------------
-                # SIMPAN EXCEL
-                # --------------------------------------------
-
-                df_raw.to_excel(
-                    EXCEL_PATH,
-                    index=False
-                )
+                session[
+                    "active_dataset"
+                ] = selected_id
 
 
                 flash(
-
-                    "Data CSV berhasil "
-                    "diperbarui dan "
-                    "hasil klasifikasi "
-                    "berhasil disinkronkan.",
-
+                    "Dataset berhasil dipilih.",
                     "success"
                 )
 
+
+            else:
+
+                flash(
+                    "Dataset tidak ditemukan.",
+                    "danger"
+                )
+
+
+            return redirect(
+                url_for("admin")
+            )
+
+
+        # ----------------------------------------------------
+        # UPLOAD DATA BARU
+        # ----------------------------------------------------
+
+        if action == "upload_dataset":
+
+            if "file_csv" not in request.files:
+
+                flash(
+                    "File CSV tidak ditemukan.",
+                    "danger"
+                )
 
                 return redirect(
                     url_for("admin")
                 )
 
 
+            file = request.files[
+                "file_csv"
+            ]
+
+
+            if not file.filename:
+
+                flash(
+                    "Silakan pilih file CSV.",
+                    "danger"
+                )
+
+                return redirect(
+                    url_for("admin")
+                )
+
+
+            if not file.filename.lower().endswith(
+                ".csv"
+            ):
+
+                flash(
+                    "File harus berformat CSV.",
+                    "danger"
+                )
+
+                return redirect(
+                    url_for("admin")
+                )
+
+
+            try:
+
+                result = (
+                    train_new_dataset(
+                        file
+                    )
+                )
+
+
+                # Setelah selesai training,
+                # dataset baru langsung aktif.
+
+                session[
+                    "active_dataset"
+                ] = result["id"]
+
+
+                flash(
+
+                    "Dataset baru berhasil "
+                    "disimpan dan dilatih. "
+
+                    f"Akurasi: "
+                    f"{result['accuracy'] * 100:.2f}%",
+
+                    "success"
+
+                )
+
+
+            except Exception as e:
+
+                print(
+                    "TRAINING ERROR:",
+                    e
+                )
+
+
+                flash(
+                    f"Training gagal: {e}",
+                    "danger"
+                )
+
+
+            return redirect(
+                url_for("admin")
+            )
+
+
+    # ========================================================
+    # DATASET AKTIF
+    # ========================================================
+
+    dataset = (
+        get_active_dataset()
+    )
+
+
+    df = dataset["df"]
+    active_model = dataset["model"]
+
+
+    # ========================================================
+    # HITUNG INFO AKTIF
+    # ========================================================
+
+    if df is not None:
+
+        X = dataset["X"]
+        y = dataset["y"]
+
+
+        X_train, X_test, y_train, y_test = (
+            train_test_split(
+
+                X,
+                y,
+
+                test_size=0.20,
+
+                random_state=42,
+
+                stratify=y
+
+            )
+        )
+
+
+        y_pred = (
+            active_model
+            .predict(X_test)
+        )
+
+
+        accuracy = (
+            accuracy_score(
+                y_test,
+                y_pred
+            )
+        )
+
+
+        total_data = len(df)
+
+        training_data = len(
+            X_train
+        )
+
+        testing_data = len(
+            X_test
+        )
+
+
+    else:
+
+        accuracy = 0
+
+        total_data = 0
+
+        training_data = 0
+
+        testing_data = 0
+
+
+    # ========================================================
+    # DATASET LIST
+    # ========================================================
+
+    registry = (
+        load_registry()
+    )
+
+
+    dataset_list = [
+
+        {
+
+            "id":
+                "original",
+
+            "name":
+                "Data Penelitian Asli",
+
+            "file":
+                "tabulasi data2.csv",
+
+            "accuracy":
+                None,
+
+            "total_data":
+                None
+
+        }
+
+    ]
+
+
+    for item in registry:
+
+        dataset_list.append({
+
+            "id":
+                item["id"],
+
+            "name":
+                item["name"],
+
+            "file":
+                item["dataset_file"],
+
+            "accuracy":
+                item["accuracy"],
+
+            "total_data":
+                item["total_data"]
+
+        })
+
+
     return render_template(
-        "admin.html"
+
+        "admin.html",
+
+        model_name=
+            dataset["name"],
+
+        dataset_file=
+            dataset["dataset_file"],
+
+        total_data=
+            total_data,
+
+        training_data=
+            training_data,
+
+        testing_data=
+            testing_data,
+
+        jumlah_tree=
+            getattr(
+                active_model,
+                "n_estimators",
+                100
+            ),
+
+        accuracy=
+            f"{accuracy * 100:.2f}",
+
+        dataset_list=
+            dataset_list,
+
+        active_dataset=
+            dataset["id"]
+
     )
 
 

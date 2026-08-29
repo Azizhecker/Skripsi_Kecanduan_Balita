@@ -1,0 +1,14 @@
+[
+    {
+        "id": "dataset_c3a7d05a",
+        "name": "data_baru_200",
+        "dataset_file": "dataset_c3a7d05a.csv",
+        "model_file": "dataset_c3a7d05a_model.pkl",
+        "excel_file": "dataset_c3a7d05a_hasil.xlsx",
+        "total_data": 200,
+        "training_data": 160,
+        "testing_data": 40,
+        "accuracy": 0.8,
+        "jumlah_tree": 100
+    }
+]
