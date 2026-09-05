@@ -10,5 +10,17 @@
         "testing_data": 40,
         "accuracy": 0.8,
         "jumlah_tree": 100
+    },
+    {
+        "id": "dataset_2b58df74",
+        "name": "data_baru_200",
+        "dataset_file": "dataset_2b58df74.csv",
+        "model_file": "dataset_2b58df74_model.pkl",
+        "excel_file": "dataset_2b58df74_hasil.xlsx",
+        "total_data": 200,
+        "training_data": 160,
+        "testing_data": 40,
+        "accuracy": 0.8,
+        "jumlah_tree": 100
     }
 ]

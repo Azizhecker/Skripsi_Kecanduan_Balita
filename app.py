@@ -1167,8 +1167,8 @@ def train_new_dataset(
 # ============================================================
 # DASHBOARD
 # ============================================================
-
 @app.route("/")
+@app.route("/dashboard")
 def dashboard():
 
     dataset = (
@@ -1623,7 +1623,7 @@ def skor_target():
 # EXCEL VIEW
 # ============================================================
 
-@app.route("/excel-view")
+@app.route("/excel")
 def excel_view():
 
     dataset = (

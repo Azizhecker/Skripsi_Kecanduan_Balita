@@ -1,43 +1,448 @@
 {% extends "base.html" %}
+
 {% block content %}
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card card-header-custom p-4 d-flex flex-row align-items-center justify-content-between">
-            <div>
-                <h2 class="fw-bold mb-1">Dashboard Model Random Forest</h2>
-                <p class="mb-0 text-white-50">Evaluasi Performa & Akurasi Klasifikasi Kecanduan Balita</p>
-            </div>
-            <div class="bg-white text-dark px-4 py-2 rounded-3 text-center shadow-sm">
-                <small class="text-muted d-block fw-bold">AKURASI MODEL</small>
-                <h2 class="fw-bold text-primary mb-0">{{ accuracy }}%</h2>
-            </div>
+
+<!-- =========================================================
+     HEADER
+========================================================= -->
+
+<div class="page-header">
+
+    <div class="page-header-content">
+
+        <div class="mb-2">
+
+            <span class="badge bg-light text-primary px-3 py-2">
+
+                <i class="fa-solid fa-shield-heart me-1"></i>
+
+                SISTEM KLASIFIKASI
+
+            </span>
+
         </div>
+
+
+        <h1>
+
+            Dashboard Random Forest
+
+        </h1>
+
+
+        <p>
+
+            Monitoring performa model klasifikasi tingkat
+            kecanduan smartphone pada balita.
+
+        </p>
+
     </div>
+
 </div>
 
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card p-3 h-100">
-            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-border-all text-primary me-2"></i>Grafik 1: Heatmap Confusion Matrix</h5>
-            <div class="text-center">
-                <img src="data:image/png;base64,{{ img_cm_heatmap }}" class="img-fluid rounded">
+
+<!-- =========================================================
+     STATISTIK MODEL
+========================================================= -->
+
+<div class="row g-4 mb-4">
+
+    <!-- AKURASI -->
+
+    <div class="col-xl-3 col-md-6">
+
+        <div class="model-stat-card">
+
+            <div class="model-stat-top">
+
+                <div>
+
+                    <div class="model-stat-label">
+                        Akurasi Model
+                    </div>
+
+                    <div class="model-stat-value">
+                        {{ accuracy }}%
+                    </div>
+
+                    <div class="model-stat-desc">
+                        Tingkat keberhasilan klasifikasi
+                    </div>
+
+                </div>
+
+                <div class="model-stat-icon accuracy-icon">
+                    <i class="fa-solid fa-bullseye"></i>
+                </div>
+
             </div>
+
+            <div class="model-stat-line accuracy-line"></div>
+
         </div>
+
     </div>
-    <div class="col-md-6">
-        <div class="card p-3 h-100">
-            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-chart-column text-success me-2"></i>Grafik 2: Breakdown Prediksi vs Aktual</h5>
-            <div class="text-center">
-                <img src="data:image/png;base64,{{ img_cm_bar }}" class="img-fluid rounded">
+
+
+    <!-- ALGORITMA -->
+
+    <div class="col-xl-3 col-md-6">
+
+        <div class="model-stat-card">
+
+            <div class="model-stat-top">
+
+                <div>
+
+                    <div class="model-stat-label">
+                        Algoritma
+                    </div>
+
+                    <div class="model-stat-value algorithm-value">
+                        Random Forest
+                    </div>
+
+                    <div class="model-stat-desc">
+                        Metode klasifikasi yang digunakan
+                    </div>
+
+                </div>
+
+                <div class="model-stat-icon algorithm-icon">
+                    <i class="fa-solid fa-tree"></i>
+                </div>
+
             </div>
+
+            <div class="model-stat-line algorithm-line"></div>
+
         </div>
+
     </div>
+
+
+    <!-- TREE -->
+
+    <div class="col-xl-3 col-md-6">
+
+        <div class="model-stat-card">
+
+            <div class="model-stat-top">
+
+                <div>
+
+                    <div class="model-stat-label">
+                        Jumlah Pohon
+                    </div>
+
+                    <div class="model-stat-value">
+                        100
+                    </div>
+
+                    <div class="model-stat-desc">
+                        Decision Tree dalam Random Forest
+                    </div>
+
+                </div>
+
+                <div class="model-stat-icon tree-icon">
+                    <i class="fa-solid fa-sitemap"></i>
+                </div>
+
+            </div>
+
+            <div class="model-stat-line tree-line"></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- FITUR -->
+
+    <div class="col-xl-3 col-md-6">
+
+        <div class="model-stat-card">
+
+            <div class="model-stat-top">
+
+                <div>
+
+                    <div class="model-stat-label">
+                        Jumlah Fitur
+                    </div>
+
+                    <div class="model-stat-value">
+                        4
+                    </div>
+
+                    <div class="model-stat-desc">
+                        Variabel input model
+                    </div>
+
+                </div>
+
+                <div class="model-stat-icon feature-icon">
+                    <i class="fa-solid fa-list-check"></i>
+                </div>
+
+            </div>
+
+            <div class="model-stat-line feature-line"></div>
+
+        </div>
+
+    </div>
+
 </div>
 
-<div class="card p-4">
-    <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-list-check text-info me-2"></i>Classification Report Lengkap</h5>
-    <div class="table-responsive">
-        {{ report_table | safe }}
+
+<!-- =========================================================
+     GRAFIK
+========================================================= -->
+
+<div class="row g-4">
+
+
+    <!-- CONFUSION MATRIX -->
+
+    <div class="col-xl-6">
+
+        <div class="card h-100">
+
+            <div class="card-header">
+
+                <h5>
+
+                    <i
+                        class="fa-solid fa-table-cells text-primary me-2">
+                    </i>
+
+                    Confusion Matrix
+
+                </h5>
+
+            </div>
+
+
+            <div class="card-body text-center">
+
+                {% if img_cm_heatmap %}
+
+                    <img
+                        src="data:image/png;base64,{{ img_cm_heatmap }}"
+                        class="img-fluid"
+                        alt="Confusion Matrix"
+                    >
+
+                {% else %}
+
+                    <div class="alert alert-warning">
+
+                        Grafik confusion matrix belum tersedia.
+
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
     </div>
+
+
+    <!-- AKTUAL VS PREDIKSI -->
+
+    <div class="col-xl-6">
+
+        <div class="card h-100">
+
+            <div class="card-header">
+
+                <h5>
+
+                    <i
+                        class="fa-solid fa-chart-column text-success me-2">
+                    </i>
+
+                    Perbandingan Aktual dan Prediksi
+
+                </h5>
+
+            </div>
+
+
+            <div class="card-body text-center">
+
+                {% if img_cm_bar %}
+
+                    <img
+                        src="data:image/png;base64,{{ img_cm_bar }}"
+                        class="img-fluid"
+                        alt="Perbandingan Aktual dan Prediksi"
+                    >
+
+                {% else %}
+
+                    <div class="alert alert-warning">
+
+                        Grafik perbandingan belum tersedia.
+
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
 </div>
+
+
+<!-- =========================================================
+     CLASSIFICATION REPORT
+========================================================= -->
+
+<div class="card mt-4">
+
+    <div class="card-header">
+
+        <h5>
+
+            <i
+                class="fa-solid fa-chart-simple text-primary me-2">
+            </i>
+
+            Classification Report
+
+        </h5>
+
+    </div>
+
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+
+            {{ report_table | safe }}
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- =========================================================
+     KETERANGAN MODEL
+========================================================= -->
+
+<div class="card">
+
+    <div class="card-header">
+
+        <h5>
+
+            <i
+                class="fa-solid fa-circle-info text-primary me-2">
+            </i>
+
+            Informasi Model
+
+        </h5>
+
+    </div>
+
+
+    <div class="card-body">
+
+        <div class="row g-3">
+
+
+            <div class="col-md-3">
+
+                <div class="p-3 bg-light rounded-3">
+
+                    <small class="text-muted">
+                        Variabel
+                    </small>
+
+                    <div class="fw-bold mt-1">
+
+                        Skor_X1
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="col-md-3">
+
+                <div class="p-3 bg-light rounded-3">
+
+                    <small class="text-muted">
+                        Variabel
+                    </small>
+
+                    <div class="fw-bold mt-1">
+
+                        Skor_X2
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="col-md-3">
+
+                <div class="p-3 bg-light rounded-3">
+
+                    <small class="text-muted">
+                        Variabel
+                    </small>
+
+                    <div class="fw-bold mt-1">
+
+                        Skor_X3
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="col-md-3">
+
+                <div class="p-3 bg-light rounded-3">
+
+                    <small class="text-muted">
+                        Variabel
+                    </small>
+
+                    <div class="fw-bold mt-1">
+
+                        Skor_X4
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+    </div>
+
+</div>
+
 {% endblock %}

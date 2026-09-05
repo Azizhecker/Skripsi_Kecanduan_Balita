@@ -1,9 +1,51 @@
 {% extends "base.html" %}
+
+{% block title %}
+Feature Importance
+{% endblock %}
+
+
 {% block content %}
-<div class="card p-4 text-center">
-    <h4 class="fw-bold text-dark mb-3"><i class="fa-solid fa-chart-bar text-primary me-2"></i>Tingkat Kepentingan Variabel (Feature Importance)</h4>
+
+<div class="page-header">
+
     <div>
-        <img src="data:image/png;base64,{{ img_fi }}" class="img-fluid rounded shadow-sm">
+
+        <h2>
+            <i class="fa-solid fa-chart-column me-2"></i>
+            Feature Importance
+        </h2>
+
+        <p>
+            Tingkat kepentingan masing-masing variabel dalam model Random Forest.
+        </p>
+
     </div>
+
 </div>
+
+
+<div class="card">
+
+    <div class="card-header">
+
+        <i class="fa-solid fa-ranking-star text-primary me-2"></i>
+
+        Tingkat Kepentingan Variabel
+
+    </div>
+
+
+    <div class="card-body text-center">
+
+        <img
+            src="data:image/png;base64,{{ img_fi }}"
+            class="img-fluid rounded"
+            style="max-height: 600px;"
+        >
+
+    </div>
+
+</div>
+
 {% endblock %}
