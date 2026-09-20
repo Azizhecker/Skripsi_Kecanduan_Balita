@@ -22,5 +22,29 @@
         "testing_data": 40,
         "accuracy": 0.8,
         "jumlah_tree": 100
+    },
+    {
+        "id": "dataset_36669855",
+        "name": "data_baru_200",
+        "dataset_file": "dataset_36669855.csv",
+        "model_file": "dataset_36669855_model.pkl",
+        "excel_file": "dataset_36669855_hasil.xlsx",
+        "total_data": 200,
+        "training_data": 160,
+        "testing_data": 40,
+        "accuracy": 0.8,
+        "jumlah_tree": 100
+    },
+    {
+        "id": "dataset_459fd43a",
+        "name": "data_baru_200_-_Salin",
+        "dataset_file": "dataset_459fd43a.csv",
+        "model_file": "dataset_459fd43a_model.pkl",
+        "excel_file": "dataset_459fd43a_hasil.xlsx",
+        "total_data": 149,
+        "training_data": 119,
+        "testing_data": 30,
+        "accuracy": 0.6666666666666666,
+        "jumlah_tree": 100
     }
 ]

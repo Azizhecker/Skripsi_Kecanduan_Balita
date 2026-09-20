@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-4">
-        <div class="card shadow">
-            <div class="card-body p-4 text-center">
-                <h4 class="mb-4">Login Administrator</h4>
-                <form method="POST">
-                    <input type="text" name="username" class="form-control mb-3" placeholder="Username" required>
-                    <input type="password" name="password" class="form-control mb-4" placeholder="Password" required>
-                    <button type="submit" class="btn btn-dark w-100">Masuk</button>
-                </form>
-            </div>
-        </div>
-    </div>
+{% block title %}Login Admin{% endblock %}
+{% block body %}
+<div class="login-page">
+<div class="login-card">
+<div class="login-mark"><div class="logo">RF</div></div>
+<h1>Login Admin</h1><p>Masuk untuk mengelola dataset dan model penelitian.</p>
+{% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="alert {{ category }}">{{ message }}</div>{% endfor %}{% endwith %}
+<form method="post">
+<div class="field"><label>Username</label><input type="text" name="username" autocomplete="username" required></div>
+<div class="field"><label>Password</label><input type="password" name="password" autocomplete="current-password" required></div>
+<button class="primary-btn" type="submit">Masuk ke Admin</button>
+</form>
+<div style="margin-top:18px;text-align:center"><a href="{{ url_for('dashboard') }}">← Kembali ke Dashboard</a></div>
+</div>
 </div>
 {% endblock %}

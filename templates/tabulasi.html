@@ -1,51 +1,5 @@
-{% extends "base.html" %}
-
-{% block title %}
-Tabulasi Data - Skripsi Balita
-{% endblock %}
-
-
+{% extends "base.html" %}{% block title %}Tabulasi Data{% endblock %}
 {% block content %}
-
-<div class="page-header">
-
-    <div>
-
-        <h2>
-            <i class="fa-solid fa-table me-2"></i>
-            Tabulasi Data Kuesioner
-        </h2>
-
-        <p>
-            Data penelitian yang digunakan dalam proses klasifikasi.
-        </p>
-
-    </div>
-
-</div>
-
-
-<div class="card">
-
-    <div class="card-header">
-
-        <i class="fa-solid fa-database text-primary me-2"></i>
-
-        Data Tabulasi Kuesioner
-
-    </div>
-
-
-    <div class="card-body">
-
-        <div class="table-responsive">
-
-            {{ table_html | safe }}
-
-        </div>
-
-    </div>
-
-</div>
-
+<section class="page-head"><div><div class="eyebrow">DATA PENELITIAN</div><h1>Tabulasi Data</h1><p>Menampilkan {{ total_data }} responden dari sheet TABULASI.</p></div></section>
+<section class="panel"><div class="table-wrap">{{ table_html|safe }}</div></section>
 {% endblock %}

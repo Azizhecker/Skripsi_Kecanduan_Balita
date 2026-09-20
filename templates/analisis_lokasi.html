@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}Analisis Lokasi{% endblock %}
+{% block content %}
+<section class="page-head"><div><div class="eyebrow">ANALISIS</div><h1>Analisis Berdasarkan Tempat Tinggal</h1><p>Perbandingan data seluruh, training, testing, label aktual dan prediksi.</p></div></section>
+<div class="two-col">
+<section class="panel"><h2>Seluruh Data</h2><div class="table-wrap">{{ total_lokasi|tojson }}</div></section>
+<section class="panel"><h2>Data Training</h2><div class="table-wrap">{{ train_lokasi|tojson }}</div></section>
+</div>
+<section class="panel"><h2>Distribusi Data Testing</h2><div class="table-wrap">{{ test_lokasi|tojson }}</div></section>
+<section class="two-col">
+<div class="panel"><h2>Label Aktual Data Uji</h2><div class="table-wrap">{{ tabel_label|safe }}</div></div>
+<div class="panel"><h2>Prediksi Random Forest</h2><div class="table-wrap">{{ tabel_prediksi|safe }}</div></div>
+</section>
+<section class="panel"><h2>TINGGI pada Data Uji</h2><p>Aktual: {{ kecanduan }}</p><p>Prediksi: {{ tinggi_prediksi }}</p></section>
+<section class="panel"><h2>Detail 40 Data Uji</h2><div class="table-wrap"><table class="data-table"><thead><tr>{% if hasil_uji %}{% for k in hasil_uji[0].keys() %}<th>{{ k }}</th>{% endfor %}</tr></thead><tbody>{% for row in hasil_uji %}<tr>{% for k in row.keys() %}<td>{{ row[k] }}</td>{% endfor %}</tr>{% endfor %}{% endif %}</tbody></table></div></section>
+{% endblock %}

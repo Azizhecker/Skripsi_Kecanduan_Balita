@@ -1,51 +1,5 @@
-{% extends "base.html" %}
-
-{% block title %}
-Hasil Excel Random Forest
-{% endblock %}
-
-
+{% extends "base.html" %}{% block title %}Hasil Excel Random Forest{% endblock %}
 {% block content %}
-
-<div class="page-header">
-
-    <div>
-
-        <h2>
-            <i class="fa-solid fa-file-excel me-2"></i>
-            Hasil Klasifikasi Random Forest
-        </h2>
-
-        <p>
-            Hasil prediksi seluruh responden berdasarkan model Random Forest.
-        </p>
-
-    </div>
-
-</div>
-
-
-<div class="card">
-
-    <div class="card-header">
-
-        <i class="fa-solid fa-table-list text-success me-2"></i>
-
-        Hasil Klasifikasi Responden
-
-    </div>
-
-
-    <div class="card-body">
-
-        <div class="table-responsive">
-
-            {{ excel_table | safe }}
-
-        </div>
-
-    </div>
-
-</div>
-
+<section class="page-head"><div><div class="eyebrow">HASIL MODEL</div><h1>Hasil Excel Random Forest</h1><p>File aktif: {{ excel_file }}</p></div></section>
+<section class="panel"><div class="table-wrap" style="max-height:none">{{ excel_table|safe }}</div></section>
 {% endblock %}

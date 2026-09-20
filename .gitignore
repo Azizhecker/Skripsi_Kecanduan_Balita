@@ -21,6 +21,4 @@ dist/
 .env.local
 .env.development.local
 .venv
-model_random_forest.pkl
-tabulasi data2.csv
-Hasil_Klasifikasi_Responden_RF.xlsx
+__pycache__

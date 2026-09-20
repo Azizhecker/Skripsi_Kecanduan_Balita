@@ -1,0 +1,16 @@
+{
+    "jumlah_data": 150,
+    "data_training": 110,
+    "data_testing": 40,
+    "jumlah_tree": 100,
+    "random_state": 42,
+    "features": [
+        "Skor_X1",
+        "Skor_X2",
+        "Skor_X3",
+        "Skor_X4"
+    ],
+    "akurasi": 0.6,
+    "dekat_kota": 62,
+    "jauh_dari_kota": 88
+}
