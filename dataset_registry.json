@@ -46,5 +46,29 @@
         "testing_data": 30,
         "accuracy": 0.6666666666666666,
         "jumlah_tree": 100
+    },
+    {
+        "id": "dataset_a8030cdf",
+        "name": "data_dummy_150_responden.csv",
+        "dataset_file": "dataset_a8030cdf_data_dummy_150_responden.csv",
+        "model_file": "dataset_a8030cdf_model.pkl",
+        "excel_file": "dataset_a8030cdf_hasil.xlsx",
+        "total_data": 150,
+        "training_data": 110,
+        "testing_data": 40,
+        "accuracy": 97.5,
+        "jumlah_tree": 100
+    },
+    {
+        "id": "dataset_1cdc2330",
+        "name": "tabulasi_data_terbaru11.xlsx",
+        "dataset_file": "dataset_1cdc2330_tabulasi_data_terbaru11.xlsx",
+        "model_file": "dataset_1cdc2330_model.pkl",
+        "excel_file": "dataset_1cdc2330_hasil.xlsx",
+        "total_data": 150,
+        "training_data": 110,
+        "testing_data": 40,
+        "accuracy": 60.0,
+        "jumlah_tree": 100
     }
 ]

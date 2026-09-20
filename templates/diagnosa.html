@@ -1,9 +1,1 @@
-{% extends "base.html" %}{% block title %}Diagnosa{% endblock %}
-{% block content %}
-<section class="page-head"><div><div class="eyebrow">PREDIKSI</div><h1>Diagnosa Kecanduan Smartphone</h1><p>Masukkan skor X1–X4 untuk mendapatkan prediksi Random Forest.</p></div></section>
-<section class="form-card">
-<form method="post"><div class="form-grid">{% for i in range(1,5) %}<div class="field"><label>Skor X{{ i }}</label><input type="number" step="any" name="x{{ i }}" required></div>{% endfor %}</div><button class="primary-btn" style="margin-top:16px" type="submit">Prediksi</button></form>
-{% if hasil %}<div class="alert success" style="margin-top:18px"><b>Hasil Prediksi: {{ hasil }}</b></div>{% endif %}
-{% if probabilitas %}<div class="panel" style="margin-top:18px"><h2>Probabilitas</h2>{% for k,v in probabilitas.items() %}<p><b>{{ k }}</b>: {{ v }}</p>{% endfor %}</div>{% endif %}
-</section>
-{% endblock %}
+{% extends 'base.html' %}{% block title %}Diagnosa{% endblock %}{% block content %}<section class="page-head"><div><div class="eyebrow">PREDIKSI</div><h1>Diagnosa Klasifikasi</h1><p>Masukkan skor X1–X4 untuk mendapatkan prediksi Random Forest.</p></div></section><section class="panel"><form method="post"><div class="grid-4">{% for key,label in [('x1','Skor X1'),('x2','Skor X2'),('x3','Skor X3'),('x4','Skor X4')] %}<div><label class="form-label">{{label}}</label><input class="form-control" type="number" step="any" name="{{key}}" value="{{values[key]}}" required></div>{% endfor %}</div><br><button class="primary-btn" type="submit">Prediksi</button></form>{% if hasil %}<div class="result-box"><h2>Hasil: <span class="result-{{ 'high' if hasil=='TINGGI' else 'mid' if hasil=='SEDANG' else 'low' }}">{{hasil}}</span></h2>{% if probabilitas %}<p><b>Probabilitas:</b></p><ul>{% for k,v in probabilitas.items() %}<li>{{k}}: {{v}}</li>{% endfor %}</ul>{% endif %}</div>{% endif %}</section>{% endblock %}

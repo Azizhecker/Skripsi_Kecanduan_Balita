@@ -1,9 +1,4 @@
-{% extends "base.html" %}{% block title %}Skor X1–X4 & Target{% endblock %}
-{% block content %}
-<section class="page-head"><div><div class="eyebrow">PENGOLAHAN DATA</div><h1>Skor X1–X4 & Target</h1><p>Rekap skor variabel dan target yang digunakan dalam Random Forest.</p></div></section>
-<div class="two-col">
-<section class="panel"><div class="panel-title"><h2>Ringkasan Skor & Target</h2></div><div class="table-wrap">{{ skor_table|safe }}</div></section>
-<section class="panel"><div class="panel-title"><h2>Distribusi Target</h2></div><div class="table-wrap">{{ target_table|safe }}</div><div style="margin-top:15px"><b>Model:</b> {{ model_info.nama_file }}<br><b>Jumlah Tree:</b> {{ model_info.jumlah_pohon }}<br><b>Random State:</b> {{ model_info.random_state }}</div></section>
-</div>
-<section class="panel"><div class="panel-title"><h2>Detail Perhitungan X1–X4</h2></div><div class="table-wrap">{{ detail_table|safe }}</div></section>
+{% extends 'base.html' %}{% block title %}Skor X1–X4 & Target{% endblock %}{% block content %}
+<section class="page-head"><div><div class="eyebrow">PENGOLAHAN DATA</div><h1>Skor X1–X4 &amp; Target</h1><p>Skor dihitung dari item X1.1–X4.3 dan target berasal dari LABEL.</p></div></section>
+<div class="two-col"><section class="panel"><div class="panel-title"><h2>Skor X1–X4 & Target</h2></div><div class="table-wrap">{{ skor_table|safe }}</div></section><section class="panel"><div class="panel-title"><h2>Distribusi Target</h2></div><div class="table-wrap">{{ target_table|safe }}</div><hr style="border:0;border-top:1px solid #e2e9ee;margin:22px 0"><h3>Model Random Forest</h3><p><b>File:</b> {{ model_info.nama_file }}</p><p><b>Tipe:</b> {{ model_info.tipe_model }}</p><p><b>Jumlah Tree:</b> {{ model_info.jumlah_pohon }}</p><p><b>Random State:</b> {{ model_info.random_state }}</p></section></div>
 {% endblock %}

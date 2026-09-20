@@ -4,1056 +4,483 @@ import pandas as pd
 import numpy as np
 
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (
-    accuracy_score,
-    confusion_matrix,
-    classification_report
-)
-
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
 # ============================================================
 # KONFIGURASI
 # ============================================================
+BASE = os.path.dirname(os.path.abspath(__file__))
 
-BASE_DIR = os.path.dirname(
-    os.path.abspath(__file__)
-)
+DATA = os.path.join(BASE, 'tabulasi_data_terbaru(1)(1).xlsx')
+MODEL = os.path.join(BASE, 'model_random_forest_110_40.pkl')
+RESULT = os.path.join(BASE, 'Hasil_RF_110_40.xlsx')
 
-DATASET_FILE = os.path.join(
-    BASE_DIR,
-    "tabulasi_data_terbaru(1)(1).xlsx"
-)
-
-MODEL_FILE = os.path.join(
-    BASE_DIR,
-    "model_random_forest_110_40.pkl"
-)
-
-EXCEL_RESULT = os.path.join(
-    BASE_DIR,
-    "Hasil_RF_110_40.xlsx"
-)
-
-
-FEATURES = [
-    "Skor_X1",
-    "Skor_X2",
-    "Skor_X3",
-    "Skor_X4"
-]
-
-TARGET = "LABEL"
-
-LOCATION = "Jarak_Kota"
-
+FEATURES = ['Skor_X1', 'Skor_X2', 'Skor_X3', 'Skor_X4']
+TARGET = 'LABEL'
+LOCATION = 'Jarak_Kota'
 
 # ============================================================
-# MEMBACA EXCEL TERBARU
+# UTILITAS
 # ============================================================
+def unique_columns(columns):
+    """Membuat nama kolom unik agar df[col] selalu menghasilkan Series."""
+    result = []
+    counts = {}
 
-def load_dataset():
+    for raw in columns:
+        name = str(raw).strip()
 
-    print("=" * 70)
-    print("MEMBACA DATASET PENELITIAN TERBARU")
-    print("=" * 70)
+        if not name or name.lower() == 'nan':
+            name = 'Unnamed'
 
-    print(
-        "\nFile:",
-        os.path.basename(DATASET_FILE)
-    )
+        count = counts.get(name, 0)
 
-    if not os.path.exists(DATASET_FILE):
+        if count == 0:
+            result.append(name)
+        else:
+            result.append(f'{name}_{count}')
 
+        counts[name] = count + 1
+
+    return result
+
+
+def normalize_location(value):
+    """Menyeragamkan isi Tempat Tinggal."""
+    value = str(value).strip().upper()
+
+    mapping = {
+        'JAUH': 'JAUH DARI KOTA',
+        'JAUH DARI KOTA': 'JAUH DARI KOTA',
+        'JAUH DARI  KOTA': 'JAUH DARI KOTA',
+        'DEKAT': 'DEKAT KOTA',
+        'DEKAT KOTA': 'DEKAT KOTA',
+        'DEKAT DARI KOTA': 'DEKAT KOTA',
+    }
+
+    return mapping.get(value, value)
+
+
+def load_data():
+    """Membaca dataset utama Excel dengan dua baris header."""
+
+    if not os.path.exists(DATA):
         raise FileNotFoundError(
-            f"File tidak ditemukan:\n{DATASET_FILE}"
+            f'Dataset tidak ditemukan:\n{DATA}'
         )
 
-    # File terbaru mempunyai 2 baris header
-    df = pd.read_excel(
-        DATASET_FILE,
-        sheet_name="TABULASI",
+    print('Membaca dataset:')
+    print(DATA)
+
+    raw = pd.read_excel(
+        DATA,
+        sheet_name='TABULASI',
         header=[0, 1]
     )
 
     # --------------------------------------------------------
-    # Gabungkan multi-header menjadi nama kolom sederhana
+    # Flatten MultiIndex header
     # --------------------------------------------------------
+    columns = []
 
-    new_columns = []
+    for col1, col2 in raw.columns:
+        h1 = str(col1).strip()
+        h2 = str(col2).strip()
 
-    for col1, col2 in df.columns:
-
-        col1 = str(col1).strip()
-        col2 = str(col2).strip()
-
-        if col1 == "RESP":
-            nama = "No_Responden"
-
-        elif col1 == "Tempat Tinggal":
-            nama = "Jarak_Kota"
-
-        elif col1 == "SKOR TOTAL Y":
-            nama = "SKOR_TOTAL_Y"
-
-        elif col1 == "LABEL":
-            nama = "LABEL"
-
+        if h1 == 'RESP':
+            name = 'No_Responden'
+        elif h1 == 'Tempat Tinggal':
+            name = 'Jarak_Kota'
+        elif h1 == 'SKOR TOTAL Y':
+            name = 'SKOR_TOTAL_Y'
+        elif h1 == 'LABEL':
+            name = 'LABEL'
         else:
-            nama = col2
+            name = h2
 
-        new_columns.append(nama)
+        columns.append(name)
 
-    df.columns = new_columns
+    raw.columns = unique_columns(columns)
 
     # --------------------------------------------------------
-    # Hapus kolom duplikat jika ada
+    # Kolom item yang wajib tersedia
     # --------------------------------------------------------
-
-    df = df.loc[
-        :,
-        ~df.columns.duplicated()
+    item_columns = [
+        'X1.1', 'X1.2', 'X1.3',
+        'X2.1', 'X2.2', 'X2.3',
+        'X3.1', 'X3.2', 'X3.3',
+        'X4.1', 'X4.2', 'X4.3',
+        'Y1', 'Y2', 'Y3', 'Y4'
     ]
 
-    # --------------------------------------------------------
-    # Normalisasi lokasi
-    # --------------------------------------------------------
+    missing = [c for c in item_columns if c not in raw.columns]
 
-    df["Jarak_Kota"] = (
-        df["Jarak_Kota"]
-        .astype(str)
-        .str.strip()
-        .str.lower()
-    )
-
-    df["Jarak_Kota"] = (
-        df["Jarak_Kota"]
-        .replace({
-            "jauh dari kota": "JAUH DARI KOTA",
-            "dekat kota": "DEKAT KOTA",
-            "jauh": "JAUH DARI KOTA",
-            "dekat": "DEKAT KOTA"
-        })
-    )
-
-    # --------------------------------------------------------
-    # Normalisasi LABEL
-    # --------------------------------------------------------
-
-    df["LABEL"] = (
-        df["LABEL"]
-        .astype(str)
-        .str.strip()
-        .str.upper()
-    )
-
-    # --------------------------------------------------------
-    # Hitung Skor X1-X4 dari item
-    # --------------------------------------------------------
-
-    kelompok = {
-
-        "Skor_X1": [
-            "X1.1",
-            "X1.2",
-            "X1.3"
-        ],
-
-        "Skor_X2": [
-            "X2.1",
-            "X2.2",
-            "X2.3"
-        ],
-
-        "Skor_X3": [
-            "X3.1",
-            "X3.2",
-            "X3.3"
-        ],
-
-        "Skor_X4": [
-            "X4.1",
-            "X4.2",
-            "X4.3"
-        ]
-    }
-
-    for skor, kolom in kelompok.items():
-
-        for c in kolom:
-
-            df[c] = pd.to_numeric(
-                df[c],
-                errors="coerce"
-            )
-
-        df[skor] = (
-            df[kolom]
-            .sum(axis=1)
+    if missing:
+        raise ValueError(
+            'Kolom dataset tidak lengkap. Kolom yang tidak ditemukan: '
+            + ', '.join(missing)
         )
 
     # --------------------------------------------------------
-    # Total Y
+    # Konversi item menjadi numerik
     # --------------------------------------------------------
-
-    y_columns = [
-        "Y1",
-        "Y2",
-        "Y3",
-        "Y4"
-    ]
-
-    for c in y_columns:
-
-        df[c] = pd.to_numeric(
-            df[c],
-            errors="coerce"
-        )
-
-    df["Total_Y"] = (
-        df[y_columns]
-        .sum(axis=1)
-    )
+    for col in item_columns:
+        raw[col] = pd.to_numeric(raw[col], errors='coerce')
 
     # --------------------------------------------------------
-    # Konversi target dan fitur
+    # Hitung skor X1-X4
     # --------------------------------------------------------
+    raw['Skor_X1'] = raw[
+        ['X1.1', 'X1.2', 'X1.3']
+    ].sum(axis=1)
 
-    for col in FEATURES:
+    raw['Skor_X2'] = raw[
+        ['X2.1', 'X2.2', 'X2.3']
+    ].sum(axis=1)
 
-        df[col] = pd.to_numeric(
-            df[col],
-            errors="coerce"
-        )
+    raw['Skor_X3'] = raw[
+        ['X3.1', 'X3.2', 'X3.3']
+    ].sum(axis=1)
+
+    raw['Skor_X4'] = raw[
+        ['X4.1', 'X4.2', 'X4.3']
+    ].sum(axis=1)
 
     # --------------------------------------------------------
-    # Hapus baris tidak valid
+    # Hitung Total Y
     # --------------------------------------------------------
+    raw['Total_Y'] = raw[
+        ['Y1', 'Y2', 'Y3', 'Y4']
+    ].sum(axis=1)
 
-    df = df.dropna(
-        subset=
-        FEATURES
-        +
-        [
-            TARGET,
-            LOCATION
-        ]
-    )
+    # --------------------------------------------------------
+    # Normalisasi lokasi dan label
+    # --------------------------------------------------------
+    raw['Jarak_Kota'] = raw['Jarak_Kota'].map(normalize_location)
+    raw['LABEL'] = raw['LABEL'].astype(str).str.strip().str.upper()
 
-    df = df.reset_index(
-        drop=True
-    )
+    # --------------------------------------------------------
+    # Buang data yang tidak lengkap
+    # --------------------------------------------------------
+    before = len(raw)
 
-    return df
+    raw = raw.dropna(
+        subset=FEATURES + [TARGET, LOCATION]
+    ).reset_index(drop=True)
+
+    after = len(raw)
+
+    if before != after:
+        print(f'Data yang dibuang karena kosong: {before - after}')
+
+    return raw
 
 
 # ============================================================
-# PEMBAGIAN DATA 110 : 40
+# PEMBAGIAN 110 TRAINING / 40 TESTING
 # ============================================================
+def split_110_40(df):
+    """
+    Split sesuai rancangan penelitian:
 
-def split_data(df):
+    Total       : 150
+    Jauh kota   : 88
+    Dekat kota  : 62
 
-    print("\n")
-    print("=" * 70)
-    print("PEMBAGIAN DATA 110 DATA LATIH + 40 DATA UJI")
-    print("=" * 70)
+    Training    : 110
+      - Jauh    : 65
+      - Dekat   : 45
+
+    Testing     : 40
+      - Jauh    : 23
+      - Dekat   : 17
+
+    Random state = 42.
+    """
+
+    far = df.index[
+        df[LOCATION] == 'JAUH DARI KOTA'
+    ].tolist()
+
+    near = df.index[
+        df[LOCATION] == 'DEKAT KOTA'
+    ].tolist()
+
+    if len(df) != 150:
+        raise ValueError(
+            f'Jumlah data harus 150, tetapi ditemukan {len(df)}.'
+        )
+
+    if len(far) != 88:
+        raise ValueError(
+            f'Data JAUH DARI KOTA harus 88, tetapi ditemukan {len(far)}.'
+        )
+
+    if len(near) != 62:
+        raise ValueError(
+            f'Data DEKAT KOTA harus 62, tetapi ditemukan {len(near)}.'
+        )
 
     rng = np.random.RandomState(42)
 
-    train_indices = []
-    test_indices = []
+    far = np.array(far, dtype=int)
+    near = np.array(near, dtype=int)
 
-    # --------------------------------------------------------
-    # JAUH DARI KOTA
-    # 88 → 65 train + 23 test
-    # --------------------------------------------------------
+    rng.shuffle(far)
+    rng.shuffle(near)
 
-    jauh_indices = df.index[
-        df[LOCATION]
-        == "JAUH DARI KOTA"
-    ].tolist()
+    train_indices = np.concatenate([
+        far[:65],
+        near[:45]
+    ])
 
-    # --------------------------------------------------------
-    # DEKAT KOTA
-    # 62 → 45 train + 17 test
-    # --------------------------------------------------------
+    test_indices = np.concatenate([
+        far[65:],
+        near[45:]
+    ])
 
-    dekat_indices = df.index[
-        df[LOCATION]
-        == "DEKAT KOTA"
-    ].tolist()
+    train_indices = sorted(train_indices.tolist())
+    test_indices = sorted(test_indices.tolist())
 
-    print(
-        "\nJumlah awal Jauh dari Kota:",
-        len(jauh_indices)
-    )
+    train = df.loc[train_indices].copy()
+    test = df.loc[test_indices].copy()
 
-    print(
-        "Jumlah awal Dekat Kota:",
-        len(dekat_indices)
-    )
-
-    # Acak dengan random_state 42
-    rng.shuffle(
-        jauh_indices
-    )
-
-    rng.shuffle(
-        dekat_indices
-    )
-
-    # --------------------------------------------------------
-    # Jauh
-    # --------------------------------------------------------
-
-    train_indices.extend(
-        jauh_indices[:65]
-    )
-
-    test_indices.extend(
-        jauh_indices[65:]
-    )
-
-    # --------------------------------------------------------
-    # Dekat
-    # --------------------------------------------------------
-
-    train_indices.extend(
-        dekat_indices[:45]
-    )
-
-    test_indices.extend(
-        dekat_indices[45:]
-    )
-
-    # Urutkan index
-    train_indices = sorted(
-        train_indices
-    )
-
-    test_indices = sorted(
-        test_indices
-    )
-
-    # --------------------------------------------------------
-    # Data
-    # --------------------------------------------------------
-
-    train_df = df.loc[
-        train_indices
-    ].copy()
-
-    test_df = df.loc[
-        test_indices
-    ].copy()
-
-    print("\nDATA LATIH")
-
-    print(
-        train_df[
-            LOCATION
-        ].value_counts()
-    )
-
-    print(
-        "\nTotal data latih:",
-        len(train_df)
-    )
-
-    print("\nDATA UJI")
-
-    print(
-        test_df[
-            LOCATION
-        ].value_counts()
-    )
-
-    print(
-        "\nTotal data uji:",
-        len(test_df)
-    )
-
-    return (
-        train_df,
-        test_df
-    )
+    return train, test
 
 
 # ============================================================
-# TRAIN RANDOM FOREST
+# CLASSIFICATION REPORT YANG AMAN UNTUK PANDAS
 # ============================================================
+def make_classification_report_df(y_true, y_pred, classes):
+    """
+    Membuat DataFrame Classification Report tanpa error:
 
-def train_model(
-    train_df,
-    test_df
-):
+        AttributeError: 'float' object has no attribute 'items'
 
-    print("\n")
-    print("=" * 70)
-    print("TRAINING RANDOM FOREST")
-    print("=" * 70)
+    Penyebab error lama:
+    classification_report output_dict=True memiliki key 'accuracy'
+    yang nilainya FLOAT, sedangkan class lainnya berupa DICT.
+    """
 
-    X_train = train_df[
-        FEATURES
-    ]
-
-    y_train = train_df[
-        TARGET
-    ]
-
-    X_test = test_df[
-        FEATURES
-    ]
-
-    y_test = test_df[
-        TARGET
-    ]
-
-    # --------------------------------------------------------
-    # Random Forest 100 Tree
-    # --------------------------------------------------------
-
-    model = RandomForestClassifier(
-
-        n_estimators=100,
-
-        random_state=42
-
-    )
-
-    print(
-        "\nJumlah Decision Tree:",
-        model.n_estimators
-    )
-
-    print(
-        "Jumlah fitur:",
-        len(FEATURES)
-    )
-
-    print(
-        "Fitur:",
-        FEATURES
-    )
-
-    # --------------------------------------------------------
-    # Training
-    # --------------------------------------------------------
-
-    model.fit(
-        X_train,
-        y_train
-    )
-
-    # --------------------------------------------------------
-    # Prediksi
-    # --------------------------------------------------------
-
-    y_pred = model.predict(
-        X_test
-    )
-
-    # --------------------------------------------------------
-    # Accuracy
-    # --------------------------------------------------------
-
-    accuracy = accuracy_score(
-        y_test,
-        y_pred
-    )
-
-    print("\n")
-    print("=" * 70)
-    print("HASIL EVALUASI")
-    print("=" * 70)
-
-    print(
-        f"\nAccuracy: {accuracy * 100:.2f}%"
-    )
-
-    # --------------------------------------------------------
-    # Confusion Matrix
-    # --------------------------------------------------------
-
-    labels = list(
-        model.classes_
-    )
-
-    cm = confusion_matrix(
-        y_test,
+    report_dict = classification_report(
+        y_true,
         y_pred,
-        labels=labels
-    )
-
-    print("\nCONFUSION MATRIX")
-
-    print(
-        pd.DataFrame(
-            cm,
-            index=labels,
-            columns=labels
-        )
-    )
-
-    # --------------------------------------------------------
-    # Classification Report
-    # --------------------------------------------------------
-
-    report = classification_report(
-        y_test,
-        y_pred,
-        labels=labels,
+        labels=list(classes),
         output_dict=True,
         zero_division=0
     )
 
-    print(
-        "\nCLASSIFICATION REPORT"
-    )
+    rows = []
 
-    print(
-        classification_report(
-            y_test,
-            y_pred,
-            zero_division=0
-        )
-    )
+    for label, value in report_dict.items():
+        # Kelas individual, macro avg, weighted avg
+        if isinstance(value, dict):
+            rows.append({
+                'Kelas': label,
+                'Precision': float(value.get('precision', 0)),
+                'Recall': float(value.get('recall', 0)),
+                'F1-Score': float(value.get('f1-score', 0)),
+                'Support': int(value.get('support', 0))
+            })
 
-    # --------------------------------------------------------
-    # Hasil data uji
-    # --------------------------------------------------------
+        # Accuracy adalah float, bukan dictionary
+        else:
+            rows.append({
+                'Kelas': label,
+                'Precision': np.nan,
+                'Recall': np.nan,
+                'F1-Score': float(value),
+                'Support': len(y_true)
+            })
 
-    hasil_uji = test_df.copy()
+    report_df = pd.DataFrame(rows)
 
-    hasil_uji[
-        "Prediksi_RF"
-    ] = y_pred
-
-    return (
-        model,
-        accuracy,
-        cm,
-        report,
-        hasil_uji
-    )
+    return report_df
 
 
 # ============================================================
-# ANALISIS LOKASI
+# TRAINING
 # ============================================================
+print('=' * 70)
+print('TRAINING RANDOM FOREST - DATASET 150 / 110 / 40')
+print('=' * 70)
 
-def analisis_lokasi(
-    df,
-    train_df,
-    test_df,
-    hasil_uji
-):
+# Load data
+df = load_data()
 
-    print("\n")
-    print("=" * 70)
-    print("ANALISIS JARAK TEMPAT TINGGAL")
-    print("=" * 70)
+print('\nDistribusi lokasi:')
+print(df[LOCATION].value_counts())
 
-    # --------------------------------------------------------
-    # Total 150
-    # --------------------------------------------------------
+print('\nDistribusi LABEL:')
+print(df[TARGET].value_counts())
 
-    total_lokasi = (
-        df[
-            LOCATION
-        ]
-        .value_counts()
-    )
+# Split
+train, test = split_110_40(df)
 
-    print(
-        "\nTOTAL 150 RESPONDEN:"
-    )
+print('\nPembagian data:')
+print(f'Total    : {len(df)}')
+print(f'Training : {len(train)}')
+print(f'Testing  : {len(test)}')
 
-    print(
-        total_lokasi
-    )
+print('\nLokasi Training:')
+print(train[LOCATION].value_counts())
 
-    # --------------------------------------------------------
-    # Training 110
-    # --------------------------------------------------------
+print('\nLokasi Testing:')
+print(test[LOCATION].value_counts())
 
-    train_lokasi = (
-        train_df[
-            LOCATION
-        ]
-        .value_counts()
-    )
+# ------------------------------------------------------------
+# Model Random Forest
+# ------------------------------------------------------------
+model = RandomForestClassifier(
+    n_estimators=100,
+    random_state=42,
+    n_jobs=-1
+)
 
-    print(
-        "\nDATA LATIH 110:"
-    )
+X_train = train[FEATURES].to_numpy()
+y_train = train[TARGET].to_numpy()
 
-    print(
-        train_lokasi
-    )
+X_test = test[FEATURES].to_numpy()
+y_test = test[TARGET].to_numpy()
 
-    # --------------------------------------------------------
-    # Testing 40
-    # --------------------------------------------------------
+print('\nMelatih Random Forest 100 tree...')
 
-    test_lokasi = (
-        test_df[
-            LOCATION
-        ]
-        .value_counts()
-    )
+model.fit(X_train, y_train)
 
-    print(
-        "\nDATA UJI 40:"
-    )
+pred = model.predict(X_test)
 
-    print(
-        test_lokasi
-    )
+# ------------------------------------------------------------
+# Evaluasi
+# ------------------------------------------------------------
+accuracy = accuracy_score(y_test, pred)
+classes = list(model.classes_)
 
-    # --------------------------------------------------------
-    # Label aktual data uji
-    # --------------------------------------------------------
+cm = confusion_matrix(
+    y_test,
+    pred,
+    labels=classes
+)
 
-    tabel_kecanduan = (
-        hasil_uji
-        .groupby(
-            LOCATION
-        )[
-            TARGET
-        ]
-        .value_counts()
-        .unstack(
-            fill_value=0
-        )
-    )
+report = make_classification_report_df(
+    y_test,
+    pred,
+    classes
+)
 
-    print(
-        "\nLABEL AKTUAL DATA UJI:"
-    )
+# ------------------------------------------------------------
+# Data hasil prediksi
+# ------------------------------------------------------------
+result_test = test.copy()
+result_test['Prediksi_RF'] = pred
+result_test['Benar'] = np.where(
+    result_test[TARGET].to_numpy() == pred,
+    'BENAR',
+    'SALAH'
+)
 
-    print(
-        tabel_kecanduan
-    )
+# ------------------------------------------------------------
+# Feature Importance
+# ------------------------------------------------------------
+feature_importance = pd.DataFrame({
+    'Fitur': FEATURES,
+    'Importance': model.feature_importances_
+}).sort_values(
+    'Importance',
+    ascending=False
+).reset_index(drop=True)
 
-    # --------------------------------------------------------
-    # Prediksi Random Forest
-    # --------------------------------------------------------
+# ------------------------------------------------------------
+# Simpan model
+# ------------------------------------------------------------
+joblib.dump(model, MODEL)
 
-    tabel_prediksi = (
-        hasil_uji
-        .groupby(
-            LOCATION
-        )[
-            "Prediksi_RF"
-        ]
-        .value_counts()
-        .unstack(
-            fill_value=0
-        )
-    )
-
-    print(
-        "\nPREDIKSI RANDOM FOREST DATA UJI:"
-    )
-
-    print(
-        tabel_prediksi
-    )
-
-    # --------------------------------------------------------
-    # TINGGI
-    # --------------------------------------------------------
-
-    tinggi_aktual = (
-        hasil_uji[
-            hasil_uji[TARGET]
-            == "TINGGI"
-        ]
-        .groupby(
-            LOCATION
-        )
-        .size()
-    )
-
-    tinggi_prediksi = (
-        hasil_uji[
-            hasil_uji[
-                "Prediksi_RF"
-            ]
-            == "TINGGI"
-        ]
-        .groupby(
-            LOCATION
-        )
-        .size()
-    )
-
-    print(
-        "\nLABEL TINGGI AKTUAL:"
-    )
-
-    print(
-        tinggi_aktual
-    )
-
-    print(
-        "\nPREDIKSI TINGGI:"
-    )
-
-    print(
-        tinggi_prediksi
-    )
-
-    return (
-        total_lokasi,
-        train_lokasi,
-        test_lokasi,
-        tabel_kecanduan,
-        tabel_prediksi,
-        tinggi_aktual,
-        tinggi_prediksi
-    )
-
-
-# ============================================================
-# SIMPAN EXCEL
-# ============================================================
-
-def save_excel(
-    df,
-    train_df,
-    test_df,
-    hasil_uji,
+# ------------------------------------------------------------
+# Simpan Excel
+# ------------------------------------------------------------
+cm_df = pd.DataFrame(
     cm,
-    report,
-    total_lokasi,
-    train_lokasi,
-    test_lokasi,
-    tabel_kecanduan,
-    tabel_prediksi
-):
+    index=classes,
+    columns=classes
+)
 
-    print("\n")
-    print("=" * 70)
-    print("MENYIMPAN HASIL EXCEL")
-    print("=" * 70)
+cm_df.index.name = 'Aktual / Prediksi'
 
-    with pd.ExcelWriter(
-        EXCEL_RESULT,
-        engine="openpyxl"
-    ) as writer:
+# Tambahkan ringkasan lokasi
+location_summary = pd.DataFrame({
+    'Lokasi': [
+        'JAUH DARI KOTA',
+        'DEKAT KOTA'
+    ],
+    'Total': [
+        int((df[LOCATION] == 'JAUH DARI KOTA').sum()),
+        int((df[LOCATION] == 'DEKAT KOTA').sum())
+    ],
+    'Training': [
+        int((train[LOCATION] == 'JAUH DARI KOTA').sum()),
+        int((train[LOCATION] == 'DEKAT KOTA').sum())
+    ],
+    'Testing': [
+        int((test[LOCATION] == 'JAUH DARI KOTA').sum()),
+        int((test[LOCATION] == 'DEKAT KOTA').sum())
+    ]
+})
 
-        # ----------------------------------------------------
-        # Data 150
-        # ----------------------------------------------------
-
-        df.to_excel(
-            writer,
-            sheet_name="Data 150",
-            index=False
-        )
-
-        # ----------------------------------------------------
-        # Data Latih
-        # ----------------------------------------------------
-
-        train_df.to_excel(
-            writer,
-            sheet_name="Data Latih 110",
-            index=False
-        )
-
-        # ----------------------------------------------------
-        # Data Uji
-        # ----------------------------------------------------
-
-        test_df.to_excel(
-            writer,
-            sheet_name="Data Uji 40",
-            index=False
-        )
-
-        # ----------------------------------------------------
-        # Hasil Prediksi
-        # ----------------------------------------------------
-
-        hasil_uji.to_excel(
-            writer,
-            sheet_name="Hasil Prediksi",
-            index=False
-        )
-
-        # ----------------------------------------------------
-        # Confusion Matrix
-        # ----------------------------------------------------
-
-        pd.DataFrame(
-            cm,
-            index=[
-                "Aktual RENDAH",
-                "Aktual SEDANG",
-                "Aktual TINGGI"
-            ],
-            columns=[
-                "Pred RENDAH",
-                "Pred SEDANG",
-                "Pred TINGGI"
-            ]
-        ).to_excel(
-            writer,
-            sheet_name="Confusion Matrix"
-        )
-
-        # ----------------------------------------------------
-        # Classification Report
-        # ----------------------------------------------------
-
-        pd.DataFrame(
-            report
-        ).transpose().to_excel(
-            writer,
-            sheet_name="Classification Report"
-        )
-
-        # ----------------------------------------------------
-        # Total lokasi
-        # ----------------------------------------------------
-
-        total_lokasi.to_frame(
-            "Jumlah"
-        ).to_excel(
-            writer,
-            sheet_name="Analisis Lokasi"
-        )
-
-        # ----------------------------------------------------
-        # Training lokasi
-        # ----------------------------------------------------
-
-        train_lokasi.to_frame(
-            "Jumlah"
-        ).to_excel(
-            writer,
-            sheet_name="Data Latih Lokasi"
-        )
-
-        # ----------------------------------------------------
-        # Testing lokasi
-        # ----------------------------------------------------
-
-        test_lokasi.to_frame(
-            "Jumlah"
-        ).to_excel(
-            writer,
-            sheet_name="Data Uji Lokasi"
-        )
-
-        # ----------------------------------------------------
-        # Kecanduan
-        # ----------------------------------------------------
-
-        tabel_kecanduan.to_excel(
-            writer,
-            sheet_name="Kecanduan Berdasarkan Lokasi"
-        )
-
-        # ----------------------------------------------------
-        # Prediksi
-        # ----------------------------------------------------
-
-        tabel_prediksi.to_excel(
-            writer,
-            sheet_name="Prediksi Berdasarkan Lokasi"
-        )
-
-    print(
-        "\nExcel berhasil dibuat:"
+with pd.ExcelWriter(
+    RESULT,
+    engine='openpyxl'
+) as writer:
+    df.to_excel(
+        writer,
+        sheet_name='Data',
+        index=False
     )
 
-    print(
-        EXCEL_RESULT
+    train.to_excel(
+        writer,
+        sheet_name='Data Latih',
+        index=False
     )
 
+    result_test.to_excel(
+        writer,
+        sheet_name='Data Uji',
+        index=False
+    )
+
+    cm_df.to_excel(
+        writer,
+        sheet_name='Confusion Matrix'
+    )
+
+    report.to_excel(
+        writer,
+        sheet_name='Classification Report',
+        index=False
+    )
+
+    feature_importance.to_excel(
+        writer,
+        sheet_name='Feature Importance',
+        index=False
+    )
+
+    location_summary.to_excel(
+        writer,
+        sheet_name='Pembagian Lokasi',
+        index=False
+    )
 
 # ============================================================
-# MAIN
+# OUTPUT
 # ============================================================
-
-if __name__ == "__main__":
-
-    df = load_dataset()
-
-    print(
-        "\nJumlah responden terbaca:",
-        len(df)
-    )
-
-    # --------------------------------------------------------
-    # Validasi 150 responden
-    # --------------------------------------------------------
-
-    if len(df) != 150:
-
-        raise ValueError(
-            f"Dataset seharusnya 150 responden, "
-            f"tetapi terbaca {len(df)}."
-        )
-
-    # --------------------------------------------------------
-    # Validasi lokasi
-    # --------------------------------------------------------
-
-    jumlah_jauh = (
-        (
-            df[LOCATION]
-            == "JAUH DARI KOTA"
-        )
-        .sum()
-    )
-
-    jumlah_dekat = (
-        (
-            df[LOCATION]
-            == "DEKAT KOTA"
-        )
-        .sum()
-    )
-
-    print(
-        "\nJumlah Jauh dari Kota:",
-        jumlah_jauh
-    )
-
-    print(
-        "Jumlah Dekat Kota:",
-        jumlah_dekat
-    )
-
-    if jumlah_jauh != 88:
-
-        raise ValueError(
-            "Jumlah Jauh dari Kota bukan 88."
-        )
-
-    if jumlah_dekat != 62:
-
-        raise ValueError(
-            "Jumlah Dekat Kota bukan 62."
-        )
-
-    # --------------------------------------------------------
-    # Split
-    # --------------------------------------------------------
-
-    train_df, test_df = split_data(
-        df
-    )
-
-    # --------------------------------------------------------
-    # Pastikan 110 + 40
-    # --------------------------------------------------------
-
-    if len(train_df) != 110:
-
-        raise ValueError(
-            "Data latih harus 110."
-        )
-
-    if len(test_df) != 40:
-
-        raise ValueError(
-            "Data uji harus 40."
-        )
-
-    # --------------------------------------------------------
-    # Training
-    # --------------------------------------------------------
-
-    (
-        model,
-        accuracy,
-        cm,
-        report,
-        hasil_uji
-    ) = train_model(
-        train_df,
-        test_df
-    )
-
-    # --------------------------------------------------------
-    # Analisis lokasi
-    # --------------------------------------------------------
-
-    (
-        total_lokasi,
-        train_lokasi,
-        test_lokasi,
-        tabel_kecanduan,
-        tabel_prediksi,
-        tinggi_aktual,
-        tinggi_prediksi
-    ) = analisis_lokasi(
-        df,
-        train_df,
-        test_df,
-        hasil_uji
-    )
-
-    # --------------------------------------------------------
-    # Simpan model
-    # --------------------------------------------------------
-
-    joblib.dump(
-        model,
-        MODEL_FILE
-    )
-
-    print(
-        "\nModel berhasil disimpan:"
-    )
-
-    print(
-        MODEL_FILE
-    )
-
-    # --------------------------------------------------------
-    # Simpan Excel
-    # --------------------------------------------------------
-
-    save_excel(
-        df,
-        train_df,
-        test_df,
-        hasil_uji,
-        cm,
-        report,
-        total_lokasi,
-        train_lokasi,
-        test_lokasi,
-        tabel_kecanduan,
-        tabel_prediksi
-    )
-
-    print("\n")
-    print("=" * 70)
-    print("TRAINING SELESAI")
-    print("=" * 70)
-
-    print(
-        f"""
-Dataset       : 150 responden
-Data latih    : 110
-Data uji      : 40
-Random Forest : 100 Tree
-Fitur         : 4
-
-Jauh dari kota : 88
-Dekat kota     : 62
-
-Model:
-{MODEL_FILE}
-
-Excel:
-{EXCEL_RESULT}
-"""
-    )
+print('\n' + '=' * 70)
+print('SELESAI')
+print('=' * 70)
+print(f'Data       : {len(df)}')
+print(f'Training   : {len(train)}')
+print(f'Testing    : {len(test)}')
+print(f'Jumlah Tree: {model.n_estimators}')
+print(f'Akurasi    : {accuracy * 100:.2f}%')
+print(f'Model      : {MODEL}')
+print(f'Excel      : {RESULT}')
+print('=' * 70)

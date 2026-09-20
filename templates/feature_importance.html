@@ -1,2 +1,1 @@
-{% extends "base.html" %}{% block title %}Feature Importance{% endblock %}
-{% block content %}<section class="page-head"><div><div class="eyebrow">MODEL</div><h1>Feature Importance</h1><p>Nilai kontribusi fitur menurut Random Forest.</p></div></section><section class="panel"><div class="chart-box"><img src="data:image/png;base64,{{ img_fi }}"></div></section>{% endblock %}
+{% extends 'base.html' %}{% block title %}Feature Importance{% endblock %}{% block content %}<section class="page-head"><div><div class="eyebrow">ANALISIS MODEL</div><h1>Feature Importance</h1><p>Kontribusi relatif fitur pada Random Forest.</p></div></section><section class="panel"><div class="chart-box"><img src="data:image/png;base64,{{ img_fi }}"></div></section>{% endblock %}

@@ -1,28 +1,7 @@
-{% extends "base.html" %}{% block title %}Admin{% endblock %}
-{% block content %}
-<section class="page-head"><div><div class="eyebrow">ADMINISTRATOR</div><h1>Kelola Dataset & Model</h1><p>Dataset aktif: {{ model_name }}</p></div><a class="secondary-btn" href="{{ url_for('logout') }}">Keluar</a></section>
-<div class="stats-grid">
-<div class="stat-card"><span>Total Data</span><strong>{{ total_data }}</strong><small>Dataset aktif</small></div>
-<div class="stat-card"><span>Training</span><strong>{{ training_data }}</strong><small>Data latih</small></div>
-<div class="stat-card"><span>Testing</span><strong>{{ testing_data }}</strong><small>Data uji</small></div>
-<div class="stat-card accent"><span>Akurasi</span><strong>{{ "%.2f"|format(accuracy|float) }}%</strong><small>{{ jumlah_tree }} tree</small></div>
-</div>
-<div class="admin-grid">
-<section class="panel"><div class="panel-title"><h2>Pilih Dataset</h2></div>
-<p style="color:var(--muted)">Pilih dataset yang ingin digunakan untuk melihat hasil klasifikasi.</p>
-<form method="post">
-<input type="hidden" name="action" value="select_dataset">
-<div class="field"><label>Dataset Tersedia</label><select name="dataset_id" style="width:100%;padding:11px;border:1px solid #cfdbe3;border-radius:8px">
-{% for d in dataset_list %}<option value="{{ d.id }}" {% if d.id == active_dataset %}selected{% endif %}>{{ d.name }} — {{ d.total_data }} data — Akurasi {{ "%.2f"|format(d.accuracy|float) }}%</option>{% endfor %}
-</select></div><button class="primary-btn" style="margin-top:12px" type="submit">Tampilkan Dataset</button></form>
-<div class="alert success" style="margin-top:15px">Dataset Aktif: Sistem saat ini menggunakan dataset yang dipilih untuk menampilkan informasi model dan hasil klasifikasi.</div>
-</section>
-<section class="panel"><div class="panel-title"><h2>Upload Dataset</h2></div>
-<div class="upload-box"><p>Upload Excel (.xlsx/.xls) atau CSV untuk membuat dataset dan model tambahan.</p>
-<form action="{{ url_for('upload_dataset') }}" method="post" enctype="multipart/form-data">
-<input type="file" name="file_dataset" accept=".xlsx,.xls,.csv" required><button class="primary-btn" type="submit">Upload & Proses Random Forest</button></form></div></section>
-</div>
-<section class="panel"><div class="panel-title"><h2>Dataset yang Tersedia</h2></div><div class="dataset-list">
-{% for d in dataset_list %}<div class="dataset-item {% if d.id == active_dataset %}active{% endif %}"><div><b>{{ d.name }}</b><small>{{ d.file }} · {{ d.total_data }} data · Akurasi {{ "%.2f"|format(d.accuracy|float) }}%</small></div><span>{% if d.id == active_dataset %}AKTIF{% endif %}</span></div>{% endfor %}
-</div></section>
+{% extends 'base.html' %}{% block title %}Admin{% endblock %}{% block content %}
+<section class="page-head"><div><div class="eyebrow">ADMINISTRATOR</div><h1>Kelola Dataset &amp; Model</h1><p>Dataset aktif: <b>{{ model_name }}</b></p></div><a class="secondary-btn" href="{{ url_for('logout') }}">Keluar</a></section>
+<div class="stats-grid"><div class="stat-card"><span>Total Data</span><strong>{{total_data}}</strong><small>Dataset aktif</small></div><div class="stat-card"><span>Training</span><strong>{{training_data}}</strong><small>Data latih</small></div><div class="stat-card"><span>Testing</span><strong>{{testing_data}}</strong><small>Data uji</small></div><div class="stat-card accent"><span>Akurasi</span><strong>{{'%.2f'|format(accuracy|float)}}%</strong><small>{{jumlah_tree}} tree</small></div></div>
+<div class="admin-grid"><section class="panel"><h2>Pilih Dataset</h2><p class="muted">Pilih dataset yang ingin digunakan untuk melihat hasil klasifikasi.</p><form method="post"><input type="hidden" name="action" value="select_dataset"><label class="form-label">Dataset Tersedia</label><select class="form-select" name="dataset_id">{% for d in dataset_list %}<option value="{{d.id}}" {% if d.id==active_dataset %}selected{% endif %}>{{d.name}} — {{d.total_data}} data — Akurasi {{'%.2f'|format(d.accuracy|float)}}%</option>{% endfor %}</select><br><br><button class="primary-btn" type="submit">Tampilkan Dataset</button></form><div class="alert success" style="margin-top:16px">Dataset Aktif: Sistem saat ini menggunakan dataset yang dipilih untuk menampilkan informasi model dan hasil klasifikasi.</div></section>
+<section class="panel"><h2>Upload Dataset</h2><p class="muted">Upload Excel (.xlsx/.xls) atau CSV untuk membuat dataset dan model tambahan.</p><form method="post" enctype="multipart/form-data"><input type="hidden" name="action" value="upload_dataset"><div class="upload-box"><input type="file" name="file_dataset" accept=".xlsx,.xls,.csv" required><button class="primary-btn" type="submit">Upload &amp; Proses Random Forest</button></div></form></section></div>
+<section class="panel"><h2>Dataset Aktif</h2><p><b>File:</b> {{dataset_file}}</p><p><b>Model:</b> Random Forest {{jumlah_tree}} tree</p></section>
 {% endblock %}

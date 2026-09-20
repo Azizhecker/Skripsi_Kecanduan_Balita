@@ -1,5 +1,3 @@
-{% extends "base.html" %}{% block title %}Hasil Excel Random Forest{% endblock %}
-{% block content %}
-<section class="page-head"><div><div class="eyebrow">HASIL MODEL</div><h1>Hasil Excel Random Forest</h1><p>File aktif: {{ excel_file }}</p></div></section>
-<section class="panel"><div class="table-wrap" style="max-height:none">{{ excel_table|safe }}</div></section>
-{% endblock %}
+{% extends 'base.html' %}{% block title %}Hasil Excel Random Forest{% endblock %}{% block content %}
+<section class="page-head"><div><div class="eyebrow">HASIL PENGOLAHAN</div><h1>Hasil Excel Random Forest</h1><p>Seluruh sheet hasil pemrosesan model ditampilkan di bawah.</p></div></section>
+<section class="panel"><div class="table-wrap">{{ excel_table|safe }}</div></section>{% endblock %}

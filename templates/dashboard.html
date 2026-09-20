@@ -1,18 +1,13 @@
-{% extends "base.html" %}
-{% block title %}Dashboard Random Forest{% endblock %}
-{% block content %}
-<section class="page-head"><div><div class="eyebrow">DASHBOARD</div><h1>Dashboard Random Forest</h1><p>{{ model_name }} — {{ total_data }} responden, {{ training_data }} training dan {{ testing_data }} testing.</p></div><a class="primary-btn" href="{{ url_for('analisis_lokasi') }}">Lihat Analisis Lokasi →</a></section>
+{% extends 'base.html' %}{% block title %}Dashboard Random Forest{% endblock %}{% block content %}
+<section class="page-head"><div><div class="eyebrow">DASHBOARD</div><h1>Dashboard Random Forest</h1><p>{{ model_name }} · evaluasi 110 data training dan 40 data testing.</p></div><a class="primary-btn" href="{{ url_for('analisis_lokasi') }}">Lihat Analisis Lokasi →</a></section>
 <div class="stats-grid">
-<div class="stat-card accent"><span>Akurasi Data Uji</span><strong>{{ "%.2f"|format(accuracy|float) }}%</strong><small>{{ testing_data }} responden testing</small></div>
+<div class="stat-card accent"><span>Akurasi Data Uji</span><strong>{{ '%.2f'|format(accuracy|float) }}%</strong><small>40 responden testing</small></div>
 <div class="stat-card"><span>Total Data</span><strong>{{ total_data }}</strong><small>Responden penelitian</small></div>
 <div class="stat-card"><span>Data Training</span><strong>{{ training_data }}</strong><small>Data untuk pelatihan</small></div>
 <div class="stat-card"><span>Decision Tree</span><strong>{{ jumlah_tree }}</strong><small>Dalam Random Forest</small></div>
 </div>
-<div class="location-hero"><div><div class="eyebrow" style="color:#dce9f2">RINGKASAN UTAMA</div><h2>Kecanduan TINGGI berdasarkan tempat tinggal</h2><p>Perbandingan ditampilkan sebagai jumlah dan persentase terhadap kelompok masing-masing.</p></div><div class="location-mini"><div><span>Dekat Kota</span><b>{{ near_high }}</b><small>{{ "%.2f"|format(near_pct|float) }}% dari {{ near_total }}</small></div><div><span>Jauh dari Kota</span><b>{{ far_high }}</b><small>{{ "%.2f"|format(far_pct|float) }}% dari {{ far_total }}</small></div></div></div>
-<div class="two-col">
-<section class="panel"><div class="panel-title"><h2>Confusion Matrix</h2><span>Data Uji {{ testing_data }}</span></div><div class="chart-box"><img src="data:image/png;base64,{{ img_cm }}"></div></section>
-<section class="panel"><div class="panel-title"><h2>Aktual vs Prediksi</h2><span>Data Uji {{ testing_data }}</span></div><div class="chart-box"><img src="data:image/png;base64,{{ img_bar }}"></div></section>
-</div>
-<section class="panel"><div class="panel-title"><h2>Ringkasan Lokasi pada Data Uji</h2><a href="{{ url_for('analisis_lokasi') }}">Detail →</a></div><div class="table-wrap">{{ location_test|safe }}</div></section>
-<section class="panel"><div class="panel-title"><h2>Classification Report</h2><span>Random Forest</span></div><div class="table-wrap">{{ report_table|safe }}</div></section>
+<div class="location-hero"><div><div class="eyebrow" style="color:#bde0f1">RINGKASAN UTAMA</div><h2>Kecanduan TINGGI berdasarkan tempat tinggal</h2><p>Perbandingan ditampilkan sebagai jumlah dan persentase dari masing-masing kelompok.</p></div><div class="location-mini"><div><span>Dekat Kota</span><b>{{ near_high }}</b><small>{{ '%.2f'|format(near_pct|float) }}% dari {{ near_total }}</small></div><div><span>Jauh dari Kota</span><b>{{ far_high }}</b><small>{{ '%.2f'|format(far_pct|float) }}% dari {{ far_total }}</small></div></div></div>
+<div class="two-col"><section class="panel"><div class="panel-title"><h2>Confusion Matrix</h2><span class="muted">Data Uji 40</span></div><div class="chart-box"><img src="data:image/png;base64,{{ img_cm }}"></div></section><section class="panel"><div class="panel-title"><h2>Aktual vs Prediksi</h2><span class="muted">Data Uji 40</span></div><div class="chart-box"><img src="data:image/png;base64,{{ img_bar }}"></div></section></div>
+<section class="panel"><div class="panel-title"><h2>Ringkasan Lokasi pada Data Uji</h2><a class="secondary-btn" href="{{ url_for('analisis_lokasi') }}">Detail →</a></div><div class="table-wrap">{{ location_test|safe }}</div></section>
+<section class="panel"><div class="panel-title"><h2>Classification Report</h2><span class="muted">Random Forest</span></div><div class="table-wrap">{{ report_table|safe }}</div></section>
 {% endblock %}

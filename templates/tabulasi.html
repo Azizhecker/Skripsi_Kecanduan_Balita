@@ -1,5 +1,3 @@
-{% extends "base.html" %}{% block title %}Tabulasi Data{% endblock %}
-{% block content %}
-<section class="page-head"><div><div class="eyebrow">DATA PENELITIAN</div><h1>Tabulasi Data</h1><p>Menampilkan {{ total_data }} responden dari sheet TABULASI.</p></div></section>
-<section class="panel"><div class="table-wrap">{{ table_html|safe }}</div></section>
-{% endblock %}
+{% extends 'base.html' %}{% block title %}Tabulasi Data{% endblock %}{% block content %}
+<section class="page-head"><div><div class="eyebrow">DATA PENELITIAN</div><h1>Tabulasi Data</h1><p>{{ model_name }} · {{ total_rows }} responden.</p></div></section>
+<section class="panel"><div class="table-wrap">{{ table_html|safe }}</div></section>{% endblock %}
