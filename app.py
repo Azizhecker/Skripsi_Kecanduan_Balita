@@ -758,53 +758,155 @@ def admin():
     if not session.get('logged_in', False):
         return redirect(url_for('login'))
 
+    # =========================================================
+    # POST: PILIH DATASET
+    # =========================================================
     if request.method == 'POST':
-        action = request.form.get('action', '')
+        action = request.form.get('action', '').strip()
 
+        # -----------------------------------------------------
+        # PILIH DATASET
+        # -----------------------------------------------------
         if action == 'select_dataset':
-            dataset_id = request.form.get('dataset_id', 'original')
-            valid = dataset_id == 'original' or any(x.get('id') == dataset_id for x in load_registry())
-            if valid:
+            dataset_id = request.form.get('dataset_id', 'original').strip()
+
+            # Dataset original selalu valid
+            if dataset_id == 'original':
+                session['active_dataset'] = 'original'
+                flash('Dataset Data Penelitian Terbaru berhasil dipilih.', 'success')
+                return redirect(url_for('admin'))
+
+            # Cek registry
+            registry = load_registry()
+
+            selected = next(
+                (item for item in registry if item.get('id') == dataset_id),
+                None
+            )
+
+            if selected:
                 session['active_dataset'] = dataset_id
-                flash('Dataset berhasil dipilih.', 'success')
+                flash(
+                    f'Dataset "{selected.get("name", "Dataset")}" berhasil dipilih.',
+                    'success'
+                )
             else:
-                flash('Dataset tidak ditemukan.', 'danger')
+                # Jika dataset sudah tidak ada, kembali ke original
+                session['active_dataset'] = 'original'
+                flash(
+                    'Dataset yang dipilih sudah tidak tersedia. '
+                    'Sistem kembali menggunakan Data Penelitian Terbaru.',
+                    'warning'
+                )
+
             return redirect(url_for('admin'))
 
+        # -----------------------------------------------------
+        # UPLOAD DATASET BARU
+        # -----------------------------------------------------
         if action == 'upload_dataset':
+
             file = request.files.get('file_dataset')
+
             if not file or not file.filename:
                 flash('Silakan pilih file terlebih dahulu.', 'danger')
                 return redirect(url_for('admin'))
 
             ext = os.path.splitext(file.filename)[1].lower()
+
             if ext not in ('.xlsx', '.xls', '.csv'):
-                flash('Format file harus .xlsx, .xls, atau .csv.', 'danger')
+                flash(
+                    'Format file harus .xlsx, .xls, atau .csv.',
+                    'danger'
+                )
                 return redirect(url_for('admin'))
 
             dataset_id = 'dataset_' + uuid.uuid4().hex[:8]
+
             safe_name = secure_filename(file.filename)
+
+            if not safe_name:
+                flash('Nama file tidak valid.', 'danger')
+                return redirect(url_for('admin'))
+
             dataset_filename = dataset_id + '_' + safe_name
-            dataset_path = os.path.join(DATASET_DIR, dataset_filename)
+
+            dataset_path = os.path.join(
+                DATASET_DIR,
+                dataset_filename
+            )
+
+            model_filename = dataset_id + '_model.pkl'
+            model_path = os.path.join(
+                MODEL_DIR,
+                model_filename
+            )
+
+            excel_filename = dataset_id + '_hasil.xlsx'
+            excel_path = os.path.join(
+                EXCEL_DIR,
+                excel_filename
+            )
 
             try:
-                file.save(dataset_path)
-                df = load_dataset_file(dataset_path)
-                if len(df) < 10:
-                    raise ValueError('Dataset minimal memiliki 10 responden setelah pembersihan.')
 
+                # =================================================
+                # 1. SIMPAN FILE DATASET
+                # =================================================
+                file.save(dataset_path)
+
+                # =================================================
+                # 2. BACA DATASET
+                # =================================================
+                df = load_dataset_file(dataset_path)
+
+                if df is None or df.empty:
+                    raise ValueError(
+                        'Dataset kosong atau tidak dapat dibaca.'
+                    )
+
+                if len(df) < 10:
+                    raise ValueError(
+                        'Dataset minimal memiliki 10 responden '
+                        'setelah pembersihan.'
+                    )
+
+                # =================================================
+                # 3. TRAINING RANDOM FOREST
+                # =================================================
                 model, train_df, test_df, result = train_uploaded_dataset(df)
 
-                model_filename = dataset_id + '_model.pkl'
-                model_path = os.path.join(MODEL_DIR, model_filename)
-                joblib.dump(model, model_path)
+                # =================================================
+                # 4. SIMPAN MODEL
+                # =================================================
+                joblib.dump(
+                    model,
+                    model_path
+                )
 
-                excel_filename = dataset_id + '_hasil.xlsx'
-                excel_path = os.path.join(EXCEL_DIR, excel_filename)
-                save_result_excel(df, train_df, test_df, result, excel_path)
+                # =================================================
+                # 5. SIMPAN HASIL EXCEL
+                # =================================================
+                save_result_excel(
+                    df,
+                    train_df,
+                    test_df,
+                    result,
+                    excel_path
+                )
 
+                # =================================================
+                # 6. UPDATE REGISTRY
+                # =================================================
                 registry = load_registry()
-                registry.append({
+
+                # Hapus entry dengan ID yang sama jika ada
+                registry = [
+                    item for item in registry
+                    if item.get('id') != dataset_id
+                ]
+
+                new_dataset = {
                     'id': dataset_id,
                     'name': safe_name,
                     'dataset_file': dataset_filename,
@@ -813,63 +915,425 @@ def admin():
                     'total_data': int(len(df)),
                     'training_data': int(len(train_df)),
                     'testing_data': int(len(test_df)),
-                    'accuracy': round(result['accuracy'] * 100, 2),
-                    'jumlah_tree': int(getattr(model, 'n_estimators', 100)),
-                })
+                    'accuracy': round(
+                        float(result['accuracy']) * 100,
+                        2
+                    ),
+                    'jumlah_tree': int(
+                        getattr(model, 'n_estimators', 100)
+                    )
+                }
+
+                registry.append(new_dataset)
+
                 save_registry(registry)
+
+                # =================================================
+                # 7. AKTIFKAN DATASET BARU
+                # =================================================
                 session['active_dataset'] = dataset_id
-                flash(f'Dataset berhasil diproses. Akurasi data uji: {result["accuracy"] * 100:.2f}%', 'success')
+
+                flash(
+                    f'Dataset "{safe_name}" berhasil diproses. '
+                    f'Akurasi data uji: '
+                    f'{float(result["accuracy"]) * 100:.2f}%',
+                    'success'
+                )
+
             except Exception as e:
-                # Hapus file sementara jika proses gagal agar registry/folder tetap bersih.
-                for p in (dataset_path,):
+
+                # ---------------------------------------------
+                # HAPUS FILE JIKA PROSES GAGAL
+                # ---------------------------------------------
+                for p in (
+                    dataset_path,
+                    model_path,
+                    excel_path
+                ):
                     if os.path.exists(p):
                         try:
                             os.remove(p)
                         except Exception:
                             pass
-                flash(f'Gagal memproses dataset: {type(e).__name__}: {e}', 'danger')
+
+                flash(
+                    f'Gagal memproses dataset: '
+                    f'{type(e).__name__}: {e}',
+                    'danger'
+                )
+
             return redirect(url_for('admin'))
 
-        # Kompatibilitas dengan form lama yang langsung POST tanpa action.
-        if 'file_dataset' in request.files:
-            request.form = request.form
+    # =========================================================
+    # GET: BERSIHKAN REGISTRY DATASET LAMA
+    # =========================================================
+
+    registry = load_registry()
+
+    cleaned_registry = []
+    seen_ids = set()
+
+    for item in registry:
+
+        dataset_id = item.get('id')
+
+        if not dataset_id:
+            continue
+
+        # -----------------------------------------------------
+        # Cegah dataset duplicate
+        # -----------------------------------------------------
+        if dataset_id in seen_ids:
+            continue
+
+        # -----------------------------------------------------
+        # Pastikan file dataset benar-benar masih ada
+        # -----------------------------------------------------
+        dataset_file = item.get('dataset_file', '')
+        model_file = item.get('model_file', '')
+        excel_file = item.get('excel_file', '')
+
+        dataset_path = os.path.join(
+            DATASET_DIR,
+            dataset_file
+        )
+
+        model_path = os.path.join(
+            MODEL_DIR,
+            model_file
+        )
+
+        excel_path = os.path.join(
+            EXCEL_DIR,
+            excel_file
+        )
+
+        # -----------------------------------------------------
+        # Jika dataset sudah dihapus dari folder,
+        # jangan tampilkan lagi di Dataset Tersedia.
+        #
+        # Dataset yang benar-benar tersedia harus memiliki:
+        # 1. file dataset
+        # 2. model
+        # 3. hasil Excel
+        # -----------------------------------------------------
+        if not os.path.isfile(dataset_path):
+            continue
+
+        if not os.path.isfile(model_path):
+            continue
+
+        if not os.path.isfile(excel_path):
+            continue
+
+        seen_ids.add(dataset_id)
+
+        cleaned_registry.append(item)
+
+    # =========================================================
+    # SIMPAN REGISTRY YANG SUDAH DIBERSIHKAN
+    # =========================================================
+
+    if cleaned_registry != registry:
+        save_registry(cleaned_registry)
+
+    registry = cleaned_registry
+
+    # =========================================================
+    # PASTIKAN DATASET AKTIF MASIH TERSEDIA
+    # =========================================================
+
+    active_id = session.get(
+        'active_dataset',
+        'original'
+    )
+
+    if active_id != 'original':
+
+        active_exists = any(
+            item.get('id') == active_id
+            for item in registry
+        )
+
+        if not active_exists:
+            active_id = 'original'
+            session['active_dataset'] = 'original'
+
+            flash(
+                'Dataset aktif sebelumnya sudah tidak tersedia. '
+                'Sistem menggunakan Data Penelitian Terbaru.',
+                'warning'
+            )
+
+    # =========================================================
+    # AMBIL DATASET AKTIF
+    # =========================================================
 
     dataset = get_active_dataset()
-    df, model = dataset['df'], dataset['model']
-    train_df, test_df = split_110_40(df)
-    result = evaluate_model(model, train_df, test_df)
 
-    dataset_list = [{
+    df = dataset['df']
+    model = dataset['model']
+
+    # =========================================================
+    # SPLIT DATA
+    # =========================================================
+
+    train_df, test_df = split_110_40(df)
+
+    # =========================================================
+    # EVALUASI MODEL
+    # =========================================================
+
+    result = evaluate_model(
+        model,
+        train_df,
+        test_df
+    )
+
+    accuracy_percent = float(
+        result.get('accuracy', 0)
+    ) * 100.0
+
+    jumlah_tree = int(
+        getattr(
+            model,
+            'n_estimators',
+            100
+        )
+    )
+
+    # =========================================================
+    # INFORMASI DATASET AKTIF
+    # =========================================================
+
+    if active_id == 'original':
+
+        active_name = 'Data Penelitian Terbaru'
+
+        active_file = os.path.basename(
+            ORIGINAL_DATASET
+        )
+
+        active_model_file = os.path.basename(
+            ORIGINAL_MODEL
+        ) if 'ORIGINAL_MODEL' in globals() else 'model_random_forest_150_110_40.pkl'
+
+        active_excel_file = (
+            'Hasil_RF_110_40.xlsx'
+            if os.path.exists(
+                os.path.join(
+                    BASE_DIR,
+                    'Hasil_RF_110_40.xlsx'
+                )
+            )
+            else '-'
+        )
+
+    else:
+
+        active_item = next(
+            (
+                item
+                for item in registry
+                if item.get('id') == active_id
+            ),
+            None
+        )
+
+        if active_item:
+
+            active_name = active_item.get(
+                'name',
+                'Dataset'
+            )
+
+            active_file = active_item.get(
+                'dataset_file',
+                '-'
+            )
+
+            active_model_file = active_item.get(
+                'model_file',
+                '-'
+            )
+
+            active_excel_file = active_item.get(
+                'excel_file',
+                '-'
+            )
+
+        else:
+
+            # Safety fallback
+            active_id = 'original'
+            session['active_dataset'] = 'original'
+
+            active_name = 'Data Penelitian Terbaru'
+
+            active_file = os.path.basename(
+                ORIGINAL_DATASET
+            )
+
+            active_model_file = 'model_random_forest_150_110_40.pkl'
+
+            active_excel_file = 'Hasil_RF_110_40.xlsx'
+
+    # =========================================================
+    # LIST DATASET YANG BENAR-BENAR TERSEDIA
+    # =========================================================
+
+    dataset_list = []
+
+    # ---------------------------------------------------------
+    # DATA PENELITIAN TERBARU / ORIGINAL
+    # ---------------------------------------------------------
+
+    dataset_list.append({
         'id': 'original',
         'name': 'Data Penelitian Terbaru',
-        'file': os.path.basename(ORIGINAL_DATASET),
-        'accuracy': round(result['accuracy'] * 100, 2),
-        'total_data': len(df),
-    }]
-    for item in load_registry():
+        'file': os.path.basename(
+            ORIGINAL_DATASET
+        ),
+        'accuracy': round(
+            accuracy_percent,
+            2
+        ),
+        'total_data': int(
+            len(df)
+        ),
+        'training_data': int(
+            len(train_df)
+        ),
+        'testing_data': int(
+            len(test_df)
+        ),
+        'jumlah_tree': jumlah_tree,
+        'is_active': active_id == 'original'
+    })
+
+    # ---------------------------------------------------------
+    # DATASET UPLOAD
+    # ---------------------------------------------------------
+
+    for item in registry:
+
+        dataset_id = item.get('id')
+
+        if not dataset_id:
+            continue
+
         dataset_list.append({
-            'id': item.get('id'),
-            'name': item.get('name', item.get('dataset_file', 'Dataset')),
-            'file': item.get('dataset_file', ''),
-            'accuracy': float(item.get('accuracy', 0)),
-            'total_data': int(item.get('total_data', 0)),
+            'id': dataset_id,
+            'name': item.get(
+                'name',
+                item.get(
+                    'dataset_file',
+                    'Dataset'
+                )
+            ),
+            'file': item.get(
+                'dataset_file',
+                ''
+            ),
+            'accuracy': float(
+                item.get(
+                    'accuracy',
+                    0
+                )
+            ),
+            'total_data': int(
+                item.get(
+                    'total_data',
+                    0
+                )
+            ),
+            'training_data': int(
+                item.get(
+                    'training_data',
+                    0
+                )
+            ),
+            'testing_data': int(
+                item.get(
+                    'testing_data',
+                    0
+                )
+            ),
+            'jumlah_tree': int(
+                item.get(
+                    'jumlah_tree',
+                    100
+                )
+            ),
+            'is_active': active_id == dataset_id
         })
+
+    # =========================================================
+    # DATASET AKTIF - INFORMASI LENGKAP
+    # =========================================================
+
+    active_dataset_info = {
+        'id': active_id,
+        'name': active_name,
+        'file': active_file,
+        'model_file': active_model_file,
+        'excel_file': active_excel_file,
+        'total_data': int(len(df)),
+        'training_data': int(len(train_df)),
+        'testing_data': int(len(test_df)),
+        'accuracy': round(
+            accuracy_percent,
+            2
+        ),
+        'jumlah_tree': jumlah_tree
+    }
+
+    # =========================================================
+    # RENDER ADMIN
+    # =========================================================
 
     return render_template(
         'admin.html',
-        model_name=dataset['name'],
-        dataset_file=dataset['file'],
+
+        # -------------------------
+        # DATASET AKTIF
+        # -------------------------
+        model_name=active_name,
+        dataset_file=active_file,
+
+        active_dataset=active_id,
+        active_dataset_info=active_dataset_info,
+
+        # -------------------------
+        # STATISTIK
+        # -------------------------
         total_data=int(len(df)),
         training_data=int(len(train_df)),
         testing_data=int(len(test_df)),
-        jumlah_tree=int(getattr(model, 'n_estimators', 100)),
-        accuracy=float(result['accuracy']) * 100.0,
+        jumlah_tree=jumlah_tree,
+        total_trees=jumlah_tree,
+
+        accuracy=float(
+            accuracy_percent
+        ),
+
+        # -------------------------
+        # LIST DATASET
+        # -------------------------
         dataset_list=dataset_list,
-        active_dataset=dataset['id']
+
+        # -------------------------
+        # REGISTRY
+        # -------------------------
+        registry=registry
     )
+
 
 # ============================================================
 # START
 # ============================================================
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(
+        debug=True
+    )

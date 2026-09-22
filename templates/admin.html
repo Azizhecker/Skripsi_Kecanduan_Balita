@@ -1,7 +1,1110 @@
-{% extends 'base.html' %}{% block title %}Admin{% endblock %}{% block content %}
-<section class="page-head"><div><div class="eyebrow">ADMINISTRATOR</div><h1>Kelola Dataset &amp; Model</h1><p>Dataset aktif: <b>{{ model_name }}</b></p></div><a class="secondary-btn" href="{{ url_for('logout') }}">Keluar</a></section>
-<div class="stats-grid"><div class="stat-card"><span>Total Data</span><strong>{{total_data}}</strong><small>Dataset aktif</small></div><div class="stat-card"><span>Training</span><strong>{{training_data}}</strong><small>Data latih</small></div><div class="stat-card"><span>Testing</span><strong>{{testing_data}}</strong><small>Data uji</small></div><div class="stat-card accent"><span>Akurasi</span><strong>{{'%.2f'|format(accuracy|float)}}%</strong><small>{{jumlah_tree}} tree</small></div></div>
-<div class="admin-grid"><section class="panel"><h2>Pilih Dataset</h2><p class="muted">Pilih dataset yang ingin digunakan untuk melihat hasil klasifikasi.</p><form method="post"><input type="hidden" name="action" value="select_dataset"><label class="form-label">Dataset Tersedia</label><select class="form-select" name="dataset_id">{% for d in dataset_list %}<option value="{{d.id}}" {% if d.id==active_dataset %}selected{% endif %}>{{d.name}} — {{d.total_data}} data — Akurasi {{'%.2f'|format(d.accuracy|float)}}%</option>{% endfor %}</select><br><br><button class="primary-btn" type="submit">Tampilkan Dataset</button></form><div class="alert success" style="margin-top:16px">Dataset Aktif: Sistem saat ini menggunakan dataset yang dipilih untuk menampilkan informasi model dan hasil klasifikasi.</div></section>
-<section class="panel"><h2>Upload Dataset</h2><p class="muted">Upload Excel (.xlsx/.xls) atau CSV untuk membuat dataset dan model tambahan.</p><form method="post" enctype="multipart/form-data"><input type="hidden" name="action" value="upload_dataset"><div class="upload-box"><input type="file" name="file_dataset" accept=".xlsx,.xls,.csv" required><button class="primary-btn" type="submit">Upload &amp; Proses Random Forest</button></div></form></section></div>
-<section class="panel"><h2>Dataset Aktif</h2><p><b>File:</b> {{dataset_file}}</p><p><b>Model:</b> Random Forest {{jumlah_tree}} tree</p></section>
+{% extends 'base.html' %}
+
+{% block title %}Admin - Kelola Dataset{% endblock %}
+
+{% block content %}
+
+<style>
+    /* =========================================================
+       ADMIN PAGE
+       ========================================================= */
+
+    .admin-page {
+        width: 100%;
+    }
+
+    /* Header */
+    .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        margin-bottom: 28px;
+    }
+
+    .admin-header-content {
+        flex: 1;
+    }
+
+    .admin-header h1 {
+        margin: 4px 0 8px;
+        font-size: 32px;
+        font-weight: 800;
+        color: #12395b;
+        letter-spacing: -0.5px;
+    }
+
+    .admin-header p {
+        margin: 0;
+        color: #6b8298;
+        font-size: 15px;
+    }
+
+    .admin-header p b {
+        color: #1769a5;
+    }
+
+    /* =========================================================
+       STATISTICS
+       ========================================================= */
+
+    .admin-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 22px;
+    }
+
+    .admin-stat {
+        position: relative;
+        background: #ffffff;
+        border: 1px solid #dfe8ef;
+        border-radius: 14px;
+        padding: 21px;
+        min-height: 125px;
+        box-shadow: 0 5px 18px rgba(21, 61, 91, 0.06);
+        overflow: hidden;
+    }
+
+    .admin-stat::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 4px;
+        background: #dce7ef;
+    }
+
+    .admin-stat.accent::before {
+        background: #e1a72c;
+    }
+
+    .admin-stat-label {
+        display: block;
+        font-size: 14px;
+        color: #71869a;
+        margin-bottom: 8px;
+    }
+
+    .admin-stat-value {
+        display: block;
+        font-size: 30px;
+        line-height: 1;
+        font-weight: 800;
+        color: #143d60;
+        margin-bottom: 10px;
+    }
+
+    .admin-stat.accent .admin-stat-value {
+        color: #17689f;
+    }
+
+    .admin-stat-note {
+        display: block;
+        font-size: 13px;
+        color: #8a9aaa;
+    }
+
+    /* =========================================================
+       MAIN GRID
+       ========================================================= */
+
+    .admin-main-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .admin-panel {
+        background: #ffffff;
+        border: 1px solid #dfe8ef;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 5px 18px rgba(21, 61, 91, 0.06);
+    }
+
+    .admin-panel h2 {
+        margin: 0 0 7px;
+        color: #123b5d;
+        font-size: 21px;
+        font-weight: 800;
+    }
+
+    .admin-panel-description {
+        margin: 0 0 20px;
+        color: #71869a;
+        line-height: 1.6;
+        font-size: 14px;
+    }
+
+    /* =========================================================
+       FORM
+       ========================================================= */
+
+    .admin-form-group {
+        margin-bottom: 16px;
+    }
+
+    .admin-form-label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #183e5d;
+    }
+
+    .admin-select {
+        width: 100%;
+        height: 48px;
+        padding: 0 14px;
+        border: 1px solid #ccdbe6;
+        border-radius: 9px;
+        background: #ffffff;
+        color: #173d5c;
+        font-size: 14px;
+        outline: none;
+        transition: all .2s ease;
+    }
+
+    .admin-select:focus {
+        border-color: #2175a8;
+        box-shadow: 0 0 0 3px rgba(33, 117, 168, .10);
+    }
+
+    /* =========================================================
+       BUTTONS
+       ========================================================= */
+
+    .admin-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 9px;
+        border: none;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all .2s ease;
+    }
+
+    .admin-button-primary {
+        color: #ffffff;
+        background: #176b9f;
+    }
+
+    .admin-button-primary:hover {
+        background: #12577f;
+        transform: translateY(-1px);
+    }
+
+    .admin-button-secondary {
+        color: #173d5c;
+        background: #ffffff;
+        border: 1px solid #d4e0e8;
+    }
+
+    .admin-button-secondary:hover {
+        background: #f4f8fb;
+    }
+
+    /* =========================================================
+       ACTIVE DATASET NOTICE
+       ========================================================= */
+
+    .active-notice {
+        margin-top: 20px;
+        padding: 15px 16px;
+        border-radius: 10px;
+        background: #edf9f2;
+        border: 1px solid #c8ead5;
+        color: #197348;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .active-notice strong {
+        color: #11663f;
+    }
+
+    /* =========================================================
+       UPLOAD
+       ========================================================= */
+
+    .upload-area {
+        border: 2px dashed #c5d8e6;
+        background: #f8fbfd;
+        border-radius: 13px;
+        padding: 25px 20px;
+        text-align: center;
+    }
+
+    .upload-icon {
+        width: 48px;
+        height: 48px;
+        margin: 0 auto 12px;
+        border-radius: 12px;
+        background: #e8f2f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #176b9f;
+        font-size: 22px;
+        font-weight: 800;
+    }
+
+    .upload-title {
+        color: #173e5d;
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .upload-description {
+        color: #7b8e9f;
+        font-size: 13px;
+        margin-bottom: 17px;
+        line-height: 1.5;
+    }
+
+    .upload-input {
+        width: 100%;
+        margin-bottom: 16px;
+        padding: 10px;
+        border: 1px solid #d2dfe8;
+        border-radius: 8px;
+        background: #ffffff;
+        font-size: 13px;
+        color: #4d6274;
+    }
+
+    /* =========================================================
+       ACTIVE DATASET
+       ========================================================= */
+
+    .active-dataset-panel {
+        margin-bottom: 20px;
+    }
+
+    .active-dataset-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .active-dataset-header h2 {
+        margin-bottom: 5px;
+    }
+
+    .active-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 11px;
+        border-radius: 20px;
+        background: #eaf7ef;
+        color: #187346;
+        border: 1px solid #c8ead6;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .active-badge::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #2a9b61;
+    }
+
+    .active-dataset-name {
+        margin: 0;
+        color: #17689e;
+        font-size: 18px;
+        font-weight: 800;
+    }
+
+    .dataset-info-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .dataset-info-item {
+        background: #f7fafc;
+        border: 1px solid #e1eaf0;
+        border-radius: 10px;
+        padding: 14px;
+        min-width: 0;
+    }
+
+    .dataset-info-item span {
+        display: block;
+        color: #8193a2;
+        font-size: 12px;
+        margin-bottom: 6px;
+    }
+
+    .dataset-info-item strong {
+        display: block;
+        color: #173e5d;
+        font-size: 14px;
+        overflow-wrap: anywhere;
+    }
+
+    /* =========================================================
+       DATASET FILE INFORMATION
+       ========================================================= */
+
+    .file-information {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid #e3ebf0;
+    }
+
+    .file-row {
+        display: grid;
+        grid-template-columns: 145px minmax(0, 1fr);
+        gap: 12px;
+        padding: 8px 0;
+        font-size: 14px;
+    }
+
+    .file-row-label {
+        color: #73879a;
+        font-weight: 600;
+    }
+
+    .file-row-value {
+        color: #173e5d;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    /* =========================================================
+       DATASET LIST
+       ========================================================= */
+
+    .dataset-list-panel {
+        margin-bottom: 20px;
+    }
+
+    .dataset-list-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 17px;
+    }
+
+    .dataset-count {
+        color: #71869a;
+        font-size: 13px;
+    }
+
+    .dataset-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .dataset-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        padding: 14px 16px;
+        border: 1px solid #e0e9ef;
+        border-radius: 11px;
+        background: #ffffff;
+        transition: all .2s ease;
+    }
+
+    .dataset-item:hover {
+        border-color: #b9cfdd;
+        background: #fafdff;
+    }
+
+    .dataset-item.active {
+        border-color: #87b8d5;
+        background: #f1f8fc;
+    }
+
+    .dataset-item-main {
+        min-width: 0;
+    }
+
+    .dataset-item-name {
+        color: #173f5f;
+        font-size: 14px;
+        font-weight: 800;
+        margin-bottom: 4px;
+        overflow-wrap: anywhere;
+    }
+
+    .dataset-item-file {
+        color: #8192a0;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+    }
+
+    .dataset-item-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .dataset-meta-badge {
+        padding: 6px 9px;
+        border-radius: 7px;
+        background: #f2f6f9;
+        color: #60788c;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .dataset-meta-badge.accuracy {
+        background: #eaf4fb;
+        color: #17689e;
+    }
+
+    .dataset-active-label {
+        padding: 6px 9px;
+        border-radius: 7px;
+        background: #eaf7ef;
+        color: #187346;
+        font-size: 11px;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    /* =========================================================
+       EMPTY STATE
+       ========================================================= */
+
+    .empty-dataset {
+        padding: 25px;
+        text-align: center;
+        background: #f8fafc;
+        border: 1px dashed #cddce6;
+        border-radius: 10px;
+        color: #7c8e9d;
+        font-size: 14px;
+    }
+
+    /* =========================================================
+       RESPONSIVE
+       ========================================================= */
+
+    @media (max-width: 1100px) {
+        .admin-stats {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .dataset-info-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 850px) {
+        .admin-main-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .admin-header {
+            flex-direction: column;
+        }
+    }
+
+    @media (max-width: 600px) {
+        .admin-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .dataset-info-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .active-dataset-header {
+            flex-direction: column;
+        }
+
+        .dataset-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .dataset-item-meta {
+            justify-content: flex-start;
+        }
+
+        .file-row {
+            grid-template-columns: 1fr;
+            gap: 3px;
+        }
+    }
+</style>
+
+
+<div class="admin-page">
+
+    <!-- =====================================================
+         HEADER
+         ====================================================== -->
+
+    <section class="admin-header">
+
+        <div class="admin-header-content">
+
+            <div class="eyebrow">
+                ADMINISTRATOR
+            </div>
+
+            <h1>
+                Kelola Dataset &amp; Model
+            </h1>
+
+            <p>
+                Dataset aktif:
+                <b>{{ active_dataset_info.name }}</b>
+            </p>
+
+        </div>
+
+        <a
+            class="admin-button admin-button-secondary"
+            href="{{ url_for('logout') }}"
+        >
+            Keluar
+        </a>
+
+    </section>
+
+
+    <!-- =====================================================
+         FLASH MESSAGE
+         ====================================================== -->
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+
+        {% if messages %}
+
+            {% for category, message in messages %}
+
+                <div
+                    class="alert {{ 'success' if category == 'success' else ('warning' if category == 'warning' else 'danger') }}"
+                    style="margin-bottom:18px;"
+                >
+                    {{ message }}
+                </div>
+
+            {% endfor %}
+
+        {% endif %}
+
+    {% endwith %}
+
+
+    <!-- =====================================================
+         STATISTICS
+         ====================================================== -->
+
+    <div class="admin-stats">
+
+        <div class="admin-stat">
+
+            <span class="admin-stat-label">
+                Total Data
+            </span>
+
+            <strong class="admin-stat-value">
+                {{ total_data }}
+            </strong>
+
+            <span class="admin-stat-note">
+                Dataset aktif
+            </span>
+
+        </div>
+
+
+        <div class="admin-stat">
+
+            <span class="admin-stat-label">
+                Training
+            </span>
+
+            <strong class="admin-stat-value">
+                {{ training_data }}
+            </strong>
+
+            <span class="admin-stat-note">
+                Data latih
+            </span>
+
+        </div>
+
+
+        <div class="admin-stat">
+
+            <span class="admin-stat-label">
+                Testing
+            </span>
+
+            <strong class="admin-stat-value">
+                {{ testing_data }}
+            </strong>
+
+            <span class="admin-stat-note">
+                Data uji
+            </span>
+
+        </div>
+
+
+        <div class="admin-stat accent">
+
+            <span class="admin-stat-label">
+                Akurasi Data Uji
+            </span>
+
+            <strong class="admin-stat-value">
+                {{ '%.2f'|format(accuracy|float) }}%
+            </strong>
+
+            <span class="admin-stat-note">
+                {{ jumlah_tree }} Decision Tree
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         PILIH DATASET + UPLOAD
+         ====================================================== -->
+
+    <div class="admin-main-grid">
+
+        <!-- =================================================
+             PILIH DATASET
+             ================================================== -->
+
+        <section class="admin-panel">
+
+            <h2>
+                Pilih Dataset
+            </h2>
+
+            <p class="admin-panel-description">
+                Pilih dataset yang ingin digunakan untuk melihat
+                hasil klasifikasi, evaluasi model, dan analisis
+                Random Forest.
+            </p>
+
+
+            <form method="post">
+
+                <input
+                    type="hidden"
+                    name="action"
+                    value="select_dataset"
+                >
+
+
+                <div class="admin-form-group">
+
+                    <label class="admin-form-label">
+                        Dataset Tersedia
+                    </label>
+
+
+                    <select
+                        class="admin-select"
+                        name="dataset_id"
+                        required
+                    >
+
+                        {% for d in dataset_list %}
+
+                            <option
+                                value="{{ d.id }}"
+                                {% if d.id == active_dataset %}
+                                    selected
+                                {% endif %}
+                            >
+
+                                {{ d.name }}
+                                — {{ d.total_data }} data
+                                — Akurasi {{ '%.2f'|format(d.accuracy|float) }}%
+
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+
+                <button
+                    class="admin-button admin-button-primary"
+                    type="submit"
+                >
+                    Tampilkan Dataset
+                </button>
+
+            </form>
+
+
+            <div class="active-notice">
+
+                <strong>Dataset Aktif:</strong>
+
+                Sistem saat ini menggunakan
+                <strong>{{ active_dataset_info.name }}</strong>
+                untuk menampilkan informasi model dan
+                hasil klasifikasi.
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             UPLOAD DATASET
+             ================================================== -->
+
+        <section class="admin-panel">
+
+            <h2>
+                Upload Dataset
+            </h2>
+
+            <p class="admin-panel-description">
+                Upload file Excel atau CSV untuk membuat
+                dataset dan model Random Forest tambahan.
+            </p>
+
+
+            <form
+                method="post"
+                enctype="multipart/form-data"
+            >
+
+                <input
+                    type="hidden"
+                    name="action"
+                    value="upload_dataset"
+                >
+
+
+                <div class="upload-area">
+
+                    <div class="upload-icon">
+                        ↑
+                    </div>
+
+                    <div class="upload-title">
+                        Upload Dataset Penelitian
+                    </div>
+
+                    <div class="upload-description">
+                        Format yang didukung:
+                        <b>.xlsx</b>,
+                        <b>.xls</b>, dan
+                        <b>.csv</b>
+                    </div>
+
+
+                    <input
+                        class="upload-input"
+                        type="file"
+                        name="file_dataset"
+                        accept=".xlsx,.xls,.csv"
+                        required
+                    >
+
+
+                    <button
+                        class="admin-button admin-button-primary"
+                        type="submit"
+                    >
+                        Upload &amp; Proses Random Forest
+                    </button>
+
+                </div>
+
+            </form>
+
+        </section>
+
+    </div>
+
+
+    <!-- =====================================================
+         DATASET AKTIF
+         ====================================================== -->
+
+    <section class="admin-panel active-dataset-panel">
+
+        <div class="active-dataset-header">
+
+            <div>
+
+                <h2>
+                    Dataset Aktif
+                </h2>
+
+                <p class="admin-panel-description" style="margin-bottom:0;">
+                    Informasi dataset yang sedang digunakan oleh
+                    sistem saat ini.
+                </p>
+
+            </div>
+
+
+            <div class="active-badge">
+                DATASET AKTIF
+            </div>
+
+        </div>
+
+
+        <p class="active-dataset-name">
+            {{ active_dataset_info.name }}
+        </p>
+
+
+        <div class="dataset-info-grid">
+
+            <div class="dataset-info-item">
+
+                <span>
+                    Total Data
+                </span>
+
+                <strong>
+                    {{ active_dataset_info.total_data }}
+                    responden
+                </strong>
+
+            </div>
+
+
+            <div class="dataset-info-item">
+
+                <span>
+                    Data Training
+                </span>
+
+                <strong>
+                    {{ active_dataset_info.training_data }}
+                    data
+                </strong>
+
+            </div>
+
+
+            <div class="dataset-info-item">
+
+                <span>
+                    Data Testing
+                </span>
+
+                <strong>
+                    {{ active_dataset_info.testing_data }}
+                    data
+                </strong>
+
+            </div>
+
+
+            <div class="dataset-info-item">
+
+                <span>
+                    Akurasi
+                </span>
+
+                <strong>
+                    {{ '%.2f'|format(active_dataset_info.accuracy|float) }}%
+                </strong>
+
+            </div>
+
+        </div>
+
+
+        <div class="file-information">
+
+            <div class="file-row">
+
+                <div class="file-row-label">
+                    File Dataset
+                </div>
+
+                <div class="file-row-value">
+                    {{ active_dataset_info.file }}
+                </div>
+
+            </div>
+
+
+            <div class="file-row">
+
+                <div class="file-row-label">
+                    Model Random Forest
+                </div>
+
+                <div class="file-row-value">
+                    {{ active_dataset_info.model_file }}
+                </div>
+
+            </div>
+
+
+            <div class="file-row">
+
+                <div class="file-row-label">
+                    Hasil Excel
+                </div>
+
+                <div class="file-row-value">
+                    {{ active_dataset_info.excel_file }}
+                </div>
+
+            </div>
+
+
+            <div class="file-row">
+
+                <div class="file-row-label">
+                    Jumlah Decision Tree
+                </div>
+
+                <div class="file-row-value">
+                    {{ active_dataset_info.jumlah_tree }} tree
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         DAFTAR DATASET
+         ====================================================== -->
+
+    <section class="admin-panel dataset-list-panel">
+
+        <div class="dataset-list-title">
+
+            <div>
+
+                <h2>
+                    Dataset Tersedia
+                </h2>
+
+                <p class="admin-panel-description" style="margin-bottom:0;">
+                    Daftar dataset yang benar-benar tersedia
+                    dan dapat digunakan oleh sistem.
+                </p>
+
+            </div>
+
+
+            <span class="dataset-count">
+                {{ dataset_list|length }} dataset
+            </span>
+
+        </div>
+
+
+        {% if dataset_list %}
+
+            <div class="dataset-list">
+
+                {% for d in dataset_list %}
+
+                    <div
+                        class="dataset-item {% if d.id == active_dataset %}active{% endif %}"
+                    >
+
+                        <div class="dataset-item-main">
+
+                            <div class="dataset-item-name">
+
+                                {{ d.name }}
+
+                                {% if d.id == active_dataset %}
+
+                                    <span class="dataset-active-label">
+                                        AKTIF
+                                    </span>
+
+                                {% endif %}
+
+                            </div>
+
+
+                            <div class="dataset-item-file">
+
+                                {{ d.file }}
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="dataset-item-meta">
+
+                            <span class="dataset-meta-badge">
+                                {{ d.total_data }} data
+                            </span>
+
+                            <span class="dataset-meta-badge">
+                                {{ d.training_data }} training
+                            </span>
+
+                            <span class="dataset-meta-badge">
+                                {{ d.testing_data }} testing
+                            </span>
+
+                            <span class="dataset-meta-badge accuracy">
+                                {{ '%.2f'|format(d.accuracy|float) }}%
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+        {% else %}
+
+            <div class="empty-dataset">
+                Belum ada dataset yang tersedia.
+            </div>
+
+        {% endif %}
+
+    </section>
+
+</div>
+
 {% endblock %}

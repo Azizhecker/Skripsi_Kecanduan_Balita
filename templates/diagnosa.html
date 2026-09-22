@@ -1,1 +1,818 @@
-{% extends 'base.html' %}{% block title %}Diagnosa{% endblock %}{% block content %}<section class="page-head"><div><div class="eyebrow">PREDIKSI</div><h1>Diagnosa Klasifikasi</h1><p>Masukkan skor X1–X4 untuk mendapatkan prediksi Random Forest.</p></div></section><section class="panel"><form method="post"><div class="grid-4">{% for key,label in [('x1','Skor X1'),('x2','Skor X2'),('x3','Skor X3'),('x4','Skor X4')] %}<div><label class="form-label">{{label}}</label><input class="form-control" type="number" step="any" name="{{key}}" value="{{values[key]}}" required></div>{% endfor %}</div><br><button class="primary-btn" type="submit">Prediksi</button></form>{% if hasil %}<div class="result-box"><h2>Hasil: <span class="result-{{ 'high' if hasil=='TINGGI' else 'mid' if hasil=='SEDANG' else 'low' }}">{{hasil}}</span></h2>{% if probabilitas %}<p><b>Probabilitas:</b></p><ul>{% for k,v in probabilitas.items() %}<li>{{k}}: {{v}}</li>{% endfor %}</ul>{% endif %}</div>{% endif %}</section>{% endblock %}
+{% extends 'base.html' %}
+
+{% block title %}Diagnosa Klasifikasi{% endblock %}
+
+{% block content %}
+
+<style>
+    .diagnosa-page {
+        width: 100%;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .diagnosa-header {
+        margin-bottom: 25px;
+    }
+
+    .diagnosa-header .eyebrow {
+        margin-bottom: 8px;
+    }
+
+    .diagnosa-header h1 {
+        margin: 0 0 8px;
+        font-size: 34px;
+        font-weight: 800;
+        color: #153b5b;
+        letter-spacing: -0.5px;
+    }
+
+    .diagnosa-header p {
+        margin: 0;
+        color: #6b8194;
+        font-size: 16px;
+        line-height: 1.6;
+    }
+
+    /* =========================
+       FORM CARD
+       ========================= */
+
+    .diagnosa-card {
+        background: #ffffff;
+        border: 1px solid #e3ebf2;
+        border-radius: 18px;
+        padding: 30px;
+        margin-bottom: 25px;
+        box-shadow: 0 8px 24px rgba(24, 61, 91, 0.07);
+    }
+
+    .diagnosa-card-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 28px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #edf2f6;
+    }
+
+    .diagnosa-icon {
+        width: 52px;
+        height: 52px;
+        min-width: 52px;
+        border-radius: 14px;
+        background: #eaf5fc;
+        color: #176a9c;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: 800;
+    }
+
+    .diagnosa-card-header h2 {
+        margin: 0 0 5px;
+        color: #153b5b;
+        font-size: 21px;
+        font-weight: 750;
+    }
+
+    .diagnosa-card-header p {
+        margin: 0;
+        color: #71869a;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    /* =========================
+       FORM GRID
+       ========================= */
+
+    .diagnosa-form-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 20px;
+    }
+
+    .diagnosa-field {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .diagnosa-field label {
+        margin-bottom: 9px;
+        color: #183d5c;
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    .field-description {
+        margin-top: 7px;
+        color: #8a9bab;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+    .diagnosa-input {
+        width: 100%;
+        height: 48px;
+        box-sizing: border-box;
+        padding: 0 14px;
+        border: 1px solid #d6e1ea;
+        border-radius: 10px;
+        outline: none;
+        background: #fbfdff;
+        color: #183d5c;
+        font-size: 15px;
+        font-weight: 600;
+        transition: 0.2s ease;
+    }
+
+    .diagnosa-input:hover {
+        border-color: #b8cad8;
+        background: #ffffff;
+    }
+
+    .diagnosa-input:focus {
+        border-color: #2877a8;
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(40, 119, 168, 0.12);
+    }
+
+    .diagnosa-action {
+        display: flex;
+        align-items: center;
+        margin-top: 27px;
+    }
+
+    .diagnosa-button {
+        padding: 12px 23px;
+        border: 0;
+        border-radius: 10px;
+        background: #176a9c;
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 750;
+        cursor: pointer;
+        box-shadow: 0 5px 14px rgba(23, 106, 156, 0.18);
+        transition: 0.2s ease;
+    }
+
+    .diagnosa-button:hover {
+        background: #12577f;
+        transform: translateY(-1px);
+        box-shadow: 0 7px 17px rgba(23, 106, 156, 0.24);
+    }
+
+    .diagnosa-button:active {
+        transform: translateY(0);
+    }
+
+    .diagnosa-info {
+        margin-top: 24px;
+        padding: 17px 19px;
+        border: 1px solid #dcecf5;
+        border-radius: 12px;
+        background: #f4f9fc;
+        color: #587086;
+        font-size: 13px;
+        line-height: 1.65;
+    }
+
+    .diagnosa-info strong {
+        color: #1a4e70;
+    }
+
+    /* =========================
+       RESULT
+       ========================= */
+
+    .result-card {
+        padding: 30px;
+        border: 1px solid #e3ebf2;
+        border-radius: 18px;
+        background: #ffffff;
+        box-shadow: 0 8px 24px rgba(24, 61, 91, 0.07);
+    }
+
+    .result-card-header {
+        margin-bottom: 22px;
+    }
+
+    .result-card-header .eyebrow {
+        margin-bottom: 6px;
+    }
+
+    .result-card-header h2 {
+        margin: 0;
+        color: #153b5b;
+        font-size: 22px;
+        font-weight: 800;
+    }
+
+    .result-main {
+        display: grid;
+        grid-template-columns: minmax(250px, 0.9fr) minmax(350px, 1.5fr);
+        gap: 24px;
+        align-items: stretch;
+    }
+
+    /* =========================
+       PREDICTION BOX
+       ========================= */
+
+    .prediction-box {
+        min-height: 210px;
+        box-sizing: border-box;
+        padding: 27px;
+        border-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .prediction-box-low {
+        background: #effaf5;
+        border: 1px solid #ccebdd;
+    }
+
+    .prediction-box-mid {
+        background: #fff8e9;
+        border: 1px solid #f4dfae;
+    }
+
+    .prediction-box-high {
+        background: #fff1f1;
+        border: 1px solid #f0cccc;
+    }
+
+    .prediction-label {
+        margin-bottom: 9px;
+        color: #71869a;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .prediction-value {
+        margin-bottom: 11px;
+        font-size: 32px;
+        font-weight: 850;
+        line-height: 1.1;
+    }
+
+    .prediction-value-low {
+        color: #16815d;
+    }
+
+    .prediction-value-mid {
+        color: #b67a10;
+    }
+
+    .prediction-value-high {
+        color: #c23b3b;
+    }
+
+    .prediction-description {
+        color: #657c8f;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    /* =========================
+       PROBABILITY
+       ========================= */
+
+    .probability-card {
+        padding: 24px;
+        border: 1px solid #e2eaf0;
+        border-radius: 16px;
+        background: #fbfdff;
+    }
+
+    .probability-card h3 {
+        margin: 0 0 18px;
+        color: #173d5c;
+        font-size: 17px;
+        font-weight: 800;
+    }
+
+    .probability-list {
+        display: flex;
+        flex-direction: column;
+        gap: 17px;
+    }
+
+    .probability-item {
+        width: 100%;
+    }
+
+    .probability-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 7px;
+    }
+
+    .probability-name {
+        color: #38556d;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .probability-value {
+        color: #173d5c;
+        font-size: 13px;
+        font-weight: 800;
+    }
+
+    .probability-progress {
+        width: 100%;
+        height: 10px;
+        display: block;
+        border: 0;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #e9f0f5;
+    }
+
+    .probability-progress::-webkit-progress-bar {
+        background: #e9f0f5;
+        border-radius: 999px;
+    }
+
+    .probability-progress::-webkit-progress-value {
+        background: #2877a8;
+        border-radius: 999px;
+    }
+
+    .probability-progress::-moz-progress-bar {
+        background: #2877a8;
+        border-radius: 999px;
+    }
+
+    /* =========================
+       EXPLANATION
+       ========================= */
+
+    .result-explanation {
+        margin-top: 22px;
+        padding: 18px 20px;
+        border: 1px solid #e5edf3;
+        border-radius: 13px;
+        background: #f7fafc;
+    }
+
+    .result-explanation h3 {
+        margin: 0 0 8px;
+        color: #183d5c;
+        font-size: 15px;
+        font-weight: 800;
+    }
+
+    .result-explanation p {
+        margin: 0;
+        color: #63798c;
+        font-size: 13px;
+        line-height: 1.7;
+    }
+
+    .model-note {
+        margin-top: 16px;
+        color: #8a9bab;
+        font-size: 12px;
+        line-height: 1.6;
+    }
+
+    /* =========================
+       RESPONSIVE
+       ========================= */
+
+    @media (max-width: 1100px) {
+        .diagnosa-form-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .result-main {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 700px) {
+        .diagnosa-card,
+        .result-card {
+            padding: 20px;
+        }
+
+        .diagnosa-header h1 {
+            font-size: 28px;
+        }
+
+        .diagnosa-form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .diagnosa-card-header {
+            flex-direction: column;
+        }
+
+        .diagnosa-icon {
+            width: 46px;
+            height: 46px;
+            min-width: 46px;
+        }
+
+        .prediction-value {
+            font-size: 28px;
+        }
+    }
+</style>
+
+
+<div class="diagnosa-page">
+
+    <!-- =========================
+         HEADER
+         ========================= -->
+
+    <section class="diagnosa-header">
+
+        <div class="eyebrow">
+            PREDIKSI
+        </div>
+
+        <h1>
+            Diagnosa Klasifikasi
+        </h1>
+
+        <p>
+            Masukkan nilai skor X1 sampai X4 untuk mendapatkan hasil klasifikasi
+            tingkat kecanduan smartphone menggunakan algoritma Random Forest.
+        </p>
+
+    </section>
+
+
+    <!-- =========================
+         FORM INPUT
+         ========================= -->
+
+    <section class="diagnosa-card">
+
+        <div class="diagnosa-card-header">
+
+            <div class="diagnosa-icon">
+                RF
+            </div>
+
+            <div>
+                <h2>
+                    Input Data Responden
+                </h2>
+
+                <p>
+                    Masukkan skor masing-masing variabel sesuai dengan hasil
+                    pengisian instrumen penelitian.
+                </p>
+            </div>
+
+        </div>
+
+
+        <form method="post">
+
+            <div class="diagnosa-form-grid">
+
+                <div class="diagnosa-field">
+
+                    <label for="x1">
+                        Skor X1
+                    </label>
+
+                    <input
+                        id="x1"
+                        class="diagnosa-input"
+                        type="number"
+                        step="any"
+                        min="0"
+                        name="x1"
+                        value="{{ values.get('x1', '') }}"
+                        required
+                    >
+
+                    <div class="field-description">
+                        Masukkan skor variabel X1.
+                    </div>
+
+                </div>
+
+
+                <div class="diagnosa-field">
+
+                    <label for="x2">
+                        Skor X2
+                    </label>
+
+                    <input
+                        id="x2"
+                        class="diagnosa-input"
+                        type="number"
+                        step="any"
+                        min="0"
+                        name="x2"
+                        value="{{ values.get('x2', '') }}"
+                        required
+                    >
+
+                    <div class="field-description">
+                        Masukkan skor variabel X2.
+                    </div>
+
+                </div>
+
+
+                <div class="diagnosa-field">
+
+                    <label for="x3">
+                        Skor X3
+                    </label>
+
+                    <input
+                        id="x3"
+                        class="diagnosa-input"
+                        type="number"
+                        step="any"
+                        min="0"
+                        name="x3"
+                        value="{{ values.get('x3', '') }}"
+                        required
+                    >
+
+                    <div class="field-description">
+                        Masukkan skor variabel X3.
+                    </div>
+
+                </div>
+
+
+                <div class="diagnosa-field">
+
+                    <label for="x4">
+                        Skor X4
+                    </label>
+
+                    <input
+                        id="x4"
+                        class="diagnosa-input"
+                        type="number"
+                        step="any"
+                        min="0"
+                        name="x4"
+                        value="{{ values.get('x4', '') }}"
+                        required
+                    >
+
+                    <div class="field-description">
+                        Masukkan skor variabel X4.
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="diagnosa-action">
+
+                <button
+                    class="diagnosa-button"
+                    type="submit"
+                >
+                    Prediksi Klasifikasi
+                </button>
+
+            </div>
+
+        </form>
+
+
+        <div class="diagnosa-info">
+
+            <strong>Informasi:</strong>
+
+            Sistem menggunakan model Random Forest yang telah dilatih
+            menggunakan data penelitian aktif. Hasil prediksi ditentukan
+            berdasarkan pola yang dipelajari oleh model dari data training.
+
+        </div>
+
+    </section>
+
+
+    {% if hasil %}
+
+    <!-- =========================
+         HASIL PREDIKSI
+         ========================= -->
+
+    <section class="result-card">
+
+        <div class="result-card-header">
+
+            <div class="eyebrow">
+                HASIL PREDIKSI
+            </div>
+
+            <h2>
+                Hasil Klasifikasi Responden
+            </h2>
+
+        </div>
+
+
+        <div class="result-main">
+
+
+            <!-- =========================
+                 HASIL UTAMA
+                 ========================= -->
+
+            {% if hasil == 'TINGGI' %}
+
+            <div class="prediction-box prediction-box-high">
+
+                <div class="prediction-label">
+                    Tingkat Kecanduan
+                </div>
+
+                <div class="prediction-value prediction-value-high">
+                    TINGGI
+                </div>
+
+                <div class="prediction-description">
+                    Hasil klasifikasi menunjukkan tingkat kecanduan
+                    smartphone berada pada kategori
+                    <strong>TINGGI</strong>
+                    berdasarkan pola yang dipelajari model.
+                </div>
+
+            </div>
+
+            {% elif hasil == 'SEDANG' %}
+
+            <div class="prediction-box prediction-box-mid">
+
+                <div class="prediction-label">
+                    Tingkat Kecanduan
+                </div>
+
+                <div class="prediction-value prediction-value-mid">
+                    SEDANG
+                </div>
+
+                <div class="prediction-description">
+                    Hasil klasifikasi menunjukkan tingkat kecanduan
+                    smartphone berada pada kategori
+                    <strong>SEDANG</strong>
+                    berdasarkan pola yang dipelajari model.
+                </div>
+
+            </div>
+
+            {% else %}
+
+            <div class="prediction-box prediction-box-low">
+
+                <div class="prediction-label">
+                    Tingkat Kecanduan
+                </div>
+
+                <div class="prediction-value prediction-value-low">
+                    RENDAH
+                </div>
+
+                <div class="prediction-description">
+                    Hasil klasifikasi menunjukkan tingkat kecanduan
+                    smartphone berada pada kategori
+                    <strong>RENDAH</strong>
+                    berdasarkan pola yang dipelajari model.
+                </div>
+
+            </div>
+
+            {% endif %}
+
+
+            <!-- =========================
+                 PROBABILITAS
+                 ========================= -->
+
+            {% if probabilitas %}
+
+            <div class="probability-card">
+
+                <h3>
+                    Probabilitas Prediksi
+                </h3>
+
+                <div class="probability-list">
+
+                    {% for k, v in probabilitas.items() %}
+
+                    {% set nilai = v|string %}
+                    {% set angka = nilai.replace('%', '')|float %}
+
+                    <div class="probability-item">
+
+                        <div class="probability-top">
+
+                            <span class="probability-name">
+                                {{ k }}
+                            </span>
+
+                            <span class="probability-value">
+                                {{ v }}
+                            </span>
+
+                        </div>
+
+                        <progress
+                            class="probability-progress"
+                            value="{{ angka }}"
+                            max="100"
+                        ></progress>
+
+                    </div>
+
+                    {% endfor %}
+
+                </div>
+
+            </div>
+
+            {% endif %}
+
+        </div>
+
+
+        <!-- =========================
+             INTERPRETASI
+             ========================= -->
+
+        <div class="result-explanation">
+
+            <h3>
+                Interpretasi Hasil
+            </h3>
+
+            {% if hasil == 'TINGGI' %}
+
+            <p>
+                Berdasarkan hasil prediksi model Random Forest, responden
+                termasuk dalam kategori <strong>TINGGI</strong>.
+                Probabilitas prediksi menunjukkan tingkat keyakinan model
+                terhadap masing-masing kelas berdasarkan pola data yang
+                digunakan dalam proses klasifikasi.
+            </p>
+
+            {% elif hasil == 'SEDANG' %}
+
+            <p>
+                Berdasarkan hasil prediksi model Random Forest, responden
+                termasuk dalam kategori <strong>SEDANG</strong>.
+                Model membandingkan nilai input X1 sampai X4 dengan pola
+                yang telah dipelajari dari data penelitian untuk menentukan
+                kelas prediksi.
+            </p>
+
+            {% else %}
+
+            <p>
+                Berdasarkan hasil prediksi model Random Forest, responden
+                termasuk dalam kategori <strong>RENDAH</strong>.
+                Model mengidentifikasi pola input yang paling sesuai
+                dengan kelas RENDAH berdasarkan data penelitian yang
+                digunakan untuk pelatihan.
+            </p>
+
+            {% endif %}
+
+        </div>
+
+
+        <div class="model-note">
+
+            Catatan: hasil ini merupakan keluaran model klasifikasi
+            Random Forest dan digunakan sebagai informasi pendukung
+            dalam penelitian.
+
+        </div>
+
+    </section>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}
